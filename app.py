@@ -85,7 +85,7 @@ def admin_required(fn):
     @wraps(fn)
     def wrapped(*args, **kwargs):
         if not session.get("admin_authenticated"):
-            flash("יש להתחבר כדי להיכנס ללוח הניהול.", "error")
+            flash(translate("Please sign in to access the admin dashboard.", "יש להתחבר כדי להיכנס ללוח הניהול."), "error")
             return redirect(url_for("admin_login"))
         return fn(*args, **kwargs)
     return wrapped
@@ -124,13 +124,85 @@ def secure_headers(response):
     return response
 
 
+def translate(en, he):
+    return he if session.get("language", "en") == "he" else en
+
+
 @app.context_processor
 def common_template_values():
     today = datetime.now(ZoneInfo("Asia/Jerusalem")).date()
+    language = session.get("language", "en")
+    translations = {
+        "site_name": "Yeshiva Dining" if language == "en" else "חדר האוכל בישיבה",
+        "admin_dashboard": "Admin dashboard" if language == "en" else "לוח ניהול",
+        "home_tagline": "YOUR VOICE HELPS US IMPROVE" if language == "en" else "המשוב שלכם עוזר לנו להשתפר",
+        "home_title": "How was your meal?" if language == "en" else "איך הייתה הארוחה?",
+        "home_intro": "Share quick, honest feedback about the food, taste, variety, and dining hall cleanliness. Your feedback helps us make every meal better." if language == "en" else "שתפו משוב קצר וכנה על האוכל, הטעם, המגוון והניקיון בחדר האוכל. המשוב שלכם עוזר לנו לשפר כל ארוחה.",
+        "give_feedback": "Give feedback" if language == "en" else "שליחת משוב",
+        "quick_simple": "Quick and simple" if language == "en" else "מהיר ופשוט",
+        "quick_simple_desc": "Rate a meal in about a minute, right from your phone." if language == "en" else "דרגו את הארוחה בתוך כדקה, ישירות מהטלפון.",
+        "help_improve": "Help us improve" if language == "en" else "עוזרים לנו להשתפר",
+        "help_improve_desc": "Your comments help the kitchen team understand what works and what needs attention." if language == "en" else "ההערות שלכם עוזרות לצוות המטבח להבין מה עובד ומה דורש שיפור.",
+        "feedback_kicker": "DINING HALL · STUDENT FEEDBACK" if language == "en" else "חדר האוכל · משוב תלמידים",
+        "feedback_title": "Tell us about your meal" if language == "en" else "ספרו לנו על הארוחה",
+        "feedback_intro": "Rate each item from 1 (poor) to 5 (excellent). No name, email, or student ID is requested. This form uses an anonymous browser token to discourage duplicate submissions for the same meal." if language == "en" else "דרגו כל סעיף מ־1 (גרוע) עד 5 (מצוין). אין צורך בשם, בדוא״ל או במספר תלמיד. נעשה שימוש במזהה דפדפן אנונימי כדי לצמצם שליחת משובים כפולים לאותה ארוחה.",
+        "meal_date": "Meal date" if language == "en" else "תאריך הארוחה",
+        "which_meal": "Which meal?" if language == "en" else "איזו ארוחה?",
+        "choose_meal": "Choose a meal" if language == "en" else "בחרו ארוחה",
+        "breakfast": "Breakfast" if language == "en" else "ארוחת בוקר",
+        "lunch": "Lunch" if language == "en" else "ארוחת צהריים",
+        "dinner": "Dinner" if language == "en" else "ארוחת ערב",
+        "food_quality": "Overall food quality" if language == "en" else "איכות האוכל הכללית",
+        "taste": "Taste" if language == "en" else "טעם",
+        "variety": "Variety of dishes" if language == "en" else "מגוון המנות",
+        "cleanliness": "Dining hall cleanliness" if language == "en" else "ניקיון חדר האוכל",
+        "poor_excellent": "1 = Poor · 5 = Excellent" if language == "en" else "1 = גרוע · 5 = מצוין",
+        "comments_label": "Additional comments (optional)" if language == "en" else "הערות נוספות (לא חובה)",
+        "comments_placeholder": "What did you like? What could be better?" if language == "en" else "מה אהבתם? מה אפשר לשפר?",
+        "submit_feedback": "Submit feedback" if language == "en" else "שליחת המשוב",
+        "thanks_title": "Thank you!" if language == "en" else "תודה רבה!",
+        "thanks_message": "Your feedback has been received. Your voice helps improve our dining experience." if language == "en" else "המשוב שלכם התקבל. בזכותכם נוכל לשפר את חוויית הארוחות.",
+        "rate_another": "Rate another meal" if language == "en" else "דירוג ארוחה נוספת",
+        "admin_login": "Manager sign in" if language == "en" else "כניסת מנהלים",
+        "admin_login_intro": "Only authorized managers can access the dashboard." if language == "en" else "הכניסה ללוח הניהול מוגבלת למנהלים בלבד.",
+        "username": "Username" if language == "en" else "שם משתמש",
+        "password": "Password" if language == "en" else "סיסמה",
+        "sign_in": "Sign in" if language == "en" else "כניסה למערכת",
+        "management": "Dining hall management" if language == "en" else "ניהול חדר האוכל",
+        "connected_as": "Signed in as:" if language == "en" else "מחובר/ת:",
+        "logout": "Sign out" if language == "en" else "התנתקות",
+        "qr_title": "Student feedback QR code" if language == "en" else "QR למשוב התלמידים",
+        "qr_desc": "Students can scan this code with their phone camera to open the form. No Google account or individual code is required." if language == "en" else "התלמידים סורקים את הקוד במצלמת הטלפון ונכנסים ישירות לטופס. אין צורך בחשבון Google או בקוד אישי.",
+        "qr_alt": "QR code for anonymous dining feedback" if language == "en" else "קוד QR למשוב אנונימי על חדר האוכל",
+        "download_qr": "Download QR for printing" if language == "en" else "הורדת QR להדפסה",
+        "duplicate_limit": "The system blocks repeat submissions from the same browser for the same meal and date. This is anonymous, but cannot reliably identify someone who switches devices or browsers." if language == "en" else "המערכת מגבילה שליחה חוזרת מאותו דפדפן לאותה ארוחה ותאריך. ההגבלה אנונימית, אך אינה יכולה לזהות בוודאות אדם שעובר למכשיר או לדפדפן אחר.",
+        "total_feedback": "Total feedback submissions" if language == "en" else "מספר משובים כולל",
+        "latest_feedback": "Latest feedback" if language == "en" else "משובים אחרונים",
+        "latest_desc": "Showing up to the latest 100 submissions. No student identity details are stored here." if language == "en" else "מוצגים עד 100 משובים אחרונים. אין כאן פרטי זהות של תלמידים.",
+        "meal_date_col": "Meal date" if language == "en" else "תאריך הארוחה",
+        "meal_col": "Meal" if language == "en" else "ארוחה",
+        "quality_col": "Quality" if language == "en" else "איכות",
+        "taste_col": "Taste" if language == "en" else "טעם",
+        "variety_col": "Variety" if language == "en" else "מגוון",
+        "cleanliness_col": "Cleanliness" if language == "en" else "ניקיון",
+        "comments_col": "Comments" if language == "en" else "הערות",
+        "submitted_col": "Submitted at" if language == "en" else "נשלח בתאריך",
+        "no_feedback": "No feedback has been received yet." if language == "en" else "עדיין לא התקבלו משובים.",
+        "something_wrong": "Something went wrong" if language == "en" else "משהו השתבש",
+        "return_home": "Return home" if language == "en" else "חזרה לדף הראשי",
+        "setup_title": "Setup required" if language == "en" else "נדרשת הגדרה",
+        "setup_message": "The action cannot be completed. A required setting is missing:" if language == "en" else "לא ניתן להשלים את הפעולה. חסרה הגדרה נדרשת:",
+        "setup_hint": "Please complete the environment variables in Render. Do not enter secrets in this form." if language == "en" else "יש להשלים את משתני הסביבה ב-Render. אין להזין סודות בטופס זה.",
+        "language_label": "שפה" if language == "en" else "Language",
+        "switch_language": "עברית" if language == "en" else "English",
+    }
     return {
         "admin_logged_in": bool(session.get("admin_authenticated")),
         "current_year": today.year,
         "current_date": today,
+        "language": language,
+        "is_hebrew": language == "he",
+        "t": translations,
     }
 
 
@@ -157,6 +229,17 @@ def index():
     return render_template("index.html")
 
 
+@app.post("/language")
+def set_language():
+    language = request.form.get("language", "en").strip().lower()
+    if language in {"en", "he"}:
+        session["language"] = language
+    next_path = request.form.get("next", "/")
+    if not next_path.startswith("/") or next_path.startswith("//"):
+        next_path = "/"
+    return redirect(next_path)
+
+
 @app.route("/feedback", methods=["GET", "POST"])
 @limiter.limit("10 per minute", methods=["POST"])
 def feedback():
@@ -168,14 +251,14 @@ def feedback():
         return attach_respondent_cookie(response, token)
 
     if not os.environ.get("DATABASE_URL"):
-        flash("The feedback service is not configured yet. Please try again later.", "error")
+        flash(translate("The feedback service is not configured yet. Please try again later.", "שירות המשוב עדיין אינו מוגדר. נסו שוב מאוחר יותר."), "error")
         return render_template("feedback.html"), 503
     if request.form.get("website", "").strip():
         return redirect(url_for("feedback_thanks"))
 
     respondent_token = request.cookies.get(RESPONDENT_COOKIE, "")
     if len(respondent_token) < 32 or len(respondent_token) > 128:
-        flash("Please scan the dining hall QR code again before submitting.", "error")
+        flash(translate("Please scan the dining hall QR code again before submitting.", "סרקו שוב את קוד ה־QR של חדר האוכל לפני שליחת המשוב."), "error")
         return redirect(url_for("feedback"))
 
     try:
@@ -204,7 +287,7 @@ def feedback():
             meal_type=meal_type,
         ).first()
         if duplicate is not None:
-            flash("A feedback response from this browser has already been recorded for this meal.", "error")
+            flash(translate("A response from this browser has already been recorded for this meal.", "כבר התקבל משוב מדפדפן זה עבור ארוחה זו."), "error")
             return render_template("feedback.html"), 409
 
         db.session.add(AnonymousSubmission(
@@ -225,7 +308,7 @@ def feedback():
         return redirect(url_for("feedback_thanks"))
     except (ValueError, TypeError):
         db.session.rollback()
-        flash("Please complete all ratings and choose a valid meal date.", "error")
+        flash(translate("Please complete all ratings and choose a valid meal date.", "יש למלא את כל הדירוגים ולבחור תאריך ארוחה תקין."), "error")
         return render_template("feedback.html"), 400
     except IntegrityError:
         db.session.rollback()
@@ -234,7 +317,7 @@ def feedback():
     except Exception:
         db.session.rollback()
         app.logger.exception("Could not save feedback")
-        flash("We could not save your feedback. Please try again later.", "error")
+        flash(translate("We could not save your feedback. Please try again later.", "לא הצלחנו לשמור את המשוב. נסו שוב מאוחר יותר."), "error")
         return render_template("feedback.html"), 503
 
 
@@ -259,7 +342,7 @@ def admin_login():
                 admin_audit("login")
                 db.session.commit()
             return redirect(url_for("admin_dashboard"))
-        flash("שם המשתמש או הסיסמה אינם נכונים.", "error")
+        flash(translate("The username or password is incorrect.", "שם המשתמש או הסיסמה אינם נכונים."), "error")
         return render_template("admin_login.html"), 401
     return render_template("admin_login.html")
 
@@ -279,10 +362,10 @@ def dashboard_response():
         abort(503, description="DATABASE_URL is not configured.")
     total = db.session.query(func.count(Feedback.id)).scalar() or 0
     averages = {
-        "איכות האוכל": db.session.query(func.avg(Feedback.food_rating)).scalar(),
-        "טעם": db.session.query(func.avg(Feedback.taste_rating)).scalar(),
-        "מגוון": db.session.query(func.avg(Feedback.variety_rating)).scalar(),
-        "ניקיון": db.session.query(func.avg(Feedback.cleanliness_rating)).scalar(),
+        translate("Food quality", "איכות האוכל"): db.session.query(func.avg(Feedback.food_rating)).scalar(),
+        translate("Taste", "טעם"): db.session.query(func.avg(Feedback.taste_rating)).scalar(),
+        translate("Variety", "מגוון"): db.session.query(func.avg(Feedback.variety_rating)).scalar(),
+        translate("Cleanliness", "ניקיון"): db.session.query(func.avg(Feedback.cleanliness_rating)).scalar(),
     }
     recent = Feedback.query.order_by(Feedback.created_at.desc()).limit(100).all()
     return render_template("admin.html", total=total, averages=averages, recent=recent)
@@ -312,7 +395,7 @@ def too_large(_error):
 
 @app.errorhandler(429)
 def rate_limited(_error):
-    return render_template("error.html", code=429, message="Too many requests. Please wait and try again."), 429
+    return render_template("error.html", code=429, message=translate("Too many requests. Please wait and try again.", "נשלחו יותר מדי בקשות. המתינו ונסו שוב.")), 429
 
 
 @app.cli.command("init-db")
