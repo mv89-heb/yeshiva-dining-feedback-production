@@ -229,3 +229,15 @@ def init_db():
     with app.app_context():
         db.create_all()
     print("Database tables are ready.")
+
+
+# Bootstrap the initial schema on startup when Neon is configured. create_all is additive
+# and does not delete existing tables or rows; future schema changes should use migrations.
+if os.environ.get("DATABASE_URL"):
+    with app.app_context():
+        try:
+            db.create_all()
+            app.logger.info("Database schema is available.")
+        except Exception:
+            db.session.rollback()
+            app.logger.exception("Database schema bootstrap failed; readiness will report the issue.")
