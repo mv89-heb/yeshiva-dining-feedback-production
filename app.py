@@ -335,7 +335,9 @@ def admin_login():
         username = request.form.get("username", "").strip()
         password = request.form.get("password", "")
         if hmac.compare_digest(username.encode("utf-8"), ADMIN_USERNAME.encode("utf-8")) and hmac.compare_digest(password.encode("utf-8"), ADMIN_PASSWORD.encode("utf-8")):
+            preferred_language = session.get("language", "en")
             session.clear()
+            session["language"] = preferred_language
             session.permanent = True
             session["admin_authenticated"] = True
             if os.environ.get("DATABASE_URL"):
@@ -353,7 +355,9 @@ def admin_logout():
     admin_audit("logout")
     if os.environ.get("DATABASE_URL"):
         db.session.commit()
+    preferred_language = session.get("language", "en")
     session.clear()
+    session["language"] = preferred_language
     return redirect(url_for("index"))
 
 
