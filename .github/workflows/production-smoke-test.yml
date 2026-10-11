@@ -55,6 +55,33 @@ jobs:
           assert b'"status": "ready"' in ready[3] or b'"status":"ready"' in ready[3], "database readiness check did not pass"
           assert b'name="csrf_token"' in feedback[3], "feedback form or CSRF token missing"
           assert any(cookie.name == "dining_respondent" for cookie in jar), "anonymous browser token cookie was not set"
+          assert b"Tell us about your meal" in feedback[3], "English should be the default language"
+
+          csrf_match = re.search(rb'name="csrf_token" value="([^"]+)"', feedback[3])
+          assert csrf_match, "language switch CSRF token missing"
+          def switch_language(language):
+              payload = urllib.parse.urlencode({
+                  "csrf_token": csrf_match.group(1).decode("ascii"),
+                  "language": language,
+                  "next": "/feedback",
+              }).encode()
+              req = urllib.request.Request(base + "/language", data=payload, headers={
+                  "Content-Type": "application/x-www-form-urlencoded",
+                  "User-Agent": "YeshivaDining-SmokeTest/1.0",
+              })
+              with opener.open(req, timeout=15) as response:
+                  assert response.status == 200, f"language switch to {language} failed"
+                  return response.read(200_000)
+
+          hebrew_feedback = switch_language("he")
+          assert b'<html lang="he" dir="rtl">' in hebrew_feedback, "Hebrew mode did not set RTL direction"
+          assert "ספרו לנו על הארוחה".encode("utf-8") in hebrew_feedback, "Hebrew translation missing"
+          hebrew_csrf = re.search(rb'name="csrf_token" value="([^"]+)"', hebrew_feedback)
+          assert hebrew_csrf, "Hebrew form CSRF token missing"
+          csrf_match = hebrew_csrf
+          english_feedback = switch_language("en")
+          assert b'<html lang="en" dir="ltr">' in english_feedback, "English mode did not restore LTR direction"
+          assert b"Tell us about your meal" in english_feedback, "English translation missing"
 
           login = get("/admin/login")
           assert login[0] == 200, f"admin login is not configured correctly: HTTP {login[0]}"
@@ -65,6 +92,6 @@ jobs:
           qr = get("/admin/qr.png")
           assert qr[0] == 200 and qr[1].rstrip("/").endswith("/admin/login"), "QR endpoint was not protected by login"
 
-          print("PASS: /health, /ready (Neon), /feedback + anonymous cookie + CSRF, manager login, and unauthenticated admin/QR protection.")
+          print("PASS: health/readiness, anonymous feedback form, English default, English↔Hebrew switching with correct text and RTL/LTR direction, manager login, and protected admin/QR endpoints.")
           print("No feedback was submitted; the smoke test is read-only.")
           PY
