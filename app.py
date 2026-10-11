@@ -193,7 +193,7 @@ def common_template_values():
         "setup_title": "Setup required" if language == "en" else "נדרשת הגדרה",
         "setup_message": "The action cannot be completed. A required setting is missing:" if language == "en" else "לא ניתן להשלים את הפעולה. חסרה הגדרה נדרשת:",
         "setup_hint": "Please complete the environment variables in Render. Do not enter secrets in this form." if language == "en" else "יש להשלים את משתני הסביבה ב-Render. אין להזין סודות בטופס זה.",
-        "language_label": "שפה" if language == "en" else "Language",
+        "language_label": "Language" if language == "en" else "שפה",
         "switch_language": "עברית" if language == "en" else "English",
     }
     return {
