@@ -1,22 +1,21 @@
 # Yeshiva Dining Feedback
 
-Flask application for anonymous dining feedback with Neon PostgreSQL and a Hebrew RTL admin dashboard. No Google account or student registration is required.
+Flask application for anonymous dining feedback with Neon PostgreSQL and a Hebrew RTL admin dashboard. Students do not need Google accounts, student registration, or individual access codes.
 
 ## Features
-- English, mobile-friendly student feedback form.
-- No student name, email, student ID, or IP address is stored in the feedback record.
-- One-time access codes: managers create codes and distribute one to each intended respondent. Each code can submit one feedback record only.
-- Only a SHA-256 digest of each access code is stored; the raw code is displayed to the manager only immediately after generation.
-- Hebrew RTL admin dashboard with averages, latest 100 submissions, and one-time code creation.
+- Students scan a shared QR code and open the English, mobile-friendly feedback form.
+- No student name, email, or student ID is requested or stored in feedback.
+- An anonymous random browser token is stored in a secure, HTTP-only cookie; only its SHA-256 digest is stored in the database.
+- A database unique constraint limits each browser token to one submission per meal type and meal date, including simultaneous duplicate requests.
+- Hebrew RTL admin dashboard with averages, latest 100 submissions, and a downloadable QR image.
 - Password-protected admin sign-in, CSRF protection, rate limits, request size limit, and security headers.
-- Liveness endpoint at /health and database readiness endpoint at /ready.
 
 ## Required Render environment variables
 - SECRET_KEY: long random secret.
 - DATABASE_URL: Neon PostgreSQL connection string with TLS enabled.
 - ADMIN_USERNAME: manager username (default is admin).
 - ADMIN_PASSWORD: strong, unique admin password.
-- APP_BASE_URL: exact public HTTPS URL for this Render service.
+- APP_BASE_URL: exact public HTTPS URL for this Render service; used to generate the QR destination.
 
 Never commit real credentials or share the Neon connection string.
 
@@ -25,13 +24,13 @@ Never commit real credentials or share the Neon connection string.
 2. Neon schema bootstrap runs additively on startup when DATABASE_URL is configured. It creates missing tables without deleting existing tables or rows.
 3. Verify /ready returns HTTP 200.
 4. Sign in at /admin/login.
-5. In the Hebrew dashboard, generate a batch of one-time codes and copy or print them. Raw codes are displayed once only. Give one code to each intended student.
-6. Each code can be used for one feedback submission. Distribute codes privately; do not post the full batch publicly.
+5. Print or display the QR shown in the admin dashboard. Students scan it and submit feedback without signing in.
+6. The same browser is blocked from submitting a second response for the same meal date and meal type.
 
 ## Privacy and abuse limits
-- The feedback record is not linked to an access-code ID; only the code's used status is recorded separately.
-- Codes prevent repeat submissions using the same issued code, not multiple submissions by a person who obtains multiple codes. Distributing one code per student in person is the practical anonymous approach.
-- Rate limiting currently uses per-process memory storage, so it is a basic safeguard rather than a guarantee against a coordinated attack.
+- The feedback record is not linked to a student identity or a respondent token. A separate table stores only a one-way hash of the anonymous browser token, meal date, and meal type to enforce duplicate limits.
+- This is a practical anonymous deterrent, not proof of one submission per human: students can bypass it by clearing browser data, using private browsing, or switching devices/browsers. A shared QR cannot reliably enforce one submission per person without an identity check or individually issued one-use credentials.
+- Rate limiting currently uses per-process memory storage, so it is a basic safeguard rather than a guarantee against coordinated abuse.
 - Render request logs may include network metadata independent of what this application stores in the feedback database.
 
 ## Local development
