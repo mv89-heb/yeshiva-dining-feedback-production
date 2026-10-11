@@ -416,20 +416,27 @@ def admin_logout():
 def dashboard_response():
     if not os.environ.get("DATABASE_URL"):
         abort(503, description="DATABASE_URL is not configured.")
-    total = db.session.query(func.count(Feedback.id)).scalar() or 0
-    averages = {
+    actor = current_admin_user()
+    can_view = bool(actor and (actor.is_superadmin or actor.can_view_feedback))
+    can_manage = bool(actor and (actor.is_superadmin or actor.can_manage_users))
+    total = db.session.query(func.count(Feedback.id)).scalar() or 0 if can_view else 0
+    averages = ({
         translate("Food quality", "איכות האוכל"): db.session.query(func.avg(Feedback.food_rating)).scalar(),
         translate("Taste", "טעם"): db.session.query(func.avg(Feedback.taste_rating)).scalar(),
         translate("Variety", "מגוון"): db.session.query(func.avg(Feedback.variety_rating)).scalar(),
         translate("Cleanliness", "ניקיון"): db.session.query(func.avg(Feedback.cleanliness_rating)).scalar(),
-    }
-    recent = Feedback.query.order_by(Feedback.created_at.desc()).limit(100).all()
-    return render_template("admin.html", total=total, averages=averages, recent=recent)
+    } if can_view else {})
+    recent = Feedback.query.order_by(Feedback.created_at.desc()).limit(100).all() if can_view else []
+    users = AdminUser.query.order_by(AdminUser.role.desc(), AdminUser.username.asc()).all() if can_manage else []
+    return render_template("admin.html", total=total, averages=averages, recent=recent, users=users, can_view_feedback=can_view, can_manage_users=can_manage)
 
 
 @app.get("/admin")
-@permission_required("can_view_feedback")
+@admin_required
 def admin_dashboard():
+    actor = current_admin_user()
+    if actor and not (actor.is_superadmin or actor.can_view_feedback or actor.can_manage_users):
+        abort(403)
     return dashboard_response()
 
 
@@ -459,9 +466,8 @@ def admin_users():
             admin_audit("created user " + username)
             db.session.commit()
             flash(translate("User created.", "המשתמש נוצר בהצלחה."), "success")
-            return redirect(url_for("admin_users"))
-    users = AdminUser.query.order_by(AdminUser.role.desc(), AdminUser.username.asc()).all()
-    return render_template("admin_users.html", users=users)
+            return redirect(url_for("admin_dashboard"))
+    return redirect(url_for("admin_dashboard"))
 
 
 @app.post("/admin/users/<int:user_id>/update")
