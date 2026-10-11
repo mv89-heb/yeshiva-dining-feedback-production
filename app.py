@@ -1,16 +1,19 @@
 import hashlib
 import hmac
+import io
 import os
 import secrets
 from datetime import datetime, timezone
 from functools import wraps
 
-from flask import Flask, abort, flash, redirect, render_template, request, session, url_for
+import qrcode
+from flask import Flask, abort, flash, redirect, render_template, request, send_file, session, url_for
 from flask_limiter import Limiter
 from flask_limiter.util import get_remote_address
 from flask_sqlalchemy import SQLAlchemy
 from flask_wtf.csrf import CSRFProtect
-from sqlalchemy import func, text
+from sqlalchemy import UniqueConstraint, func, text
+from sqlalchemy.exc import IntegrityError
 from werkzeug.middleware.proxy_fix import ProxyFix
 
 app = Flask(__name__)
@@ -38,6 +41,8 @@ limiter = Limiter(get_remote_address, app=app, default_limits=[], storage_uri="m
 ADMIN_USERNAME = os.environ.get("ADMIN_USERNAME", "admin").strip()
 ADMIN_PASSWORD = os.environ.get("ADMIN_PASSWORD", "")
 APP_BASE_URL = os.environ.get("APP_BASE_URL", "").rstrip("/")
+RESPONDENT_COOKIE = "dining_respondent"
+RESPONDENT_COOKIE_MAX_AGE = 60 * 60 * 24 * 365
 
 
 class Feedback(db.Model):
@@ -52,11 +57,16 @@ class Feedback(db.Model):
     created_at = db.Column(db.DateTime(timezone=True), nullable=False, default=lambda: datetime.now(timezone.utc), index=True)
 
 
-class AccessCode(db.Model):
+class AnonymousSubmission(db.Model):
+    __tablename__ = "anonymous_submissions"
     id = db.Column(db.Integer, primary_key=True)
-    token_hash = db.Column(db.String(64), nullable=False, unique=True, index=True)
+    respondent_hash = db.Column(db.String(64), nullable=False)
+    meal_date = db.Column(db.Date, nullable=False)
+    meal_type = db.Column(db.String(20), nullable=False)
     created_at = db.Column(db.DateTime(timezone=True), nullable=False, default=lambda: datetime.now(timezone.utc))
-    used_at = db.Column(db.DateTime(timezone=True), nullable=True, index=True)
+    __table_args__ = (
+        UniqueConstraint("respondent_hash", "meal_date", "meal_type", name="uq_anonymous_respondent_meal"),
+    )
 
 
 class AdminAudit(db.Model):
@@ -76,13 +86,26 @@ def admin_required(fn):
     return wrapped
 
 
-def token_digest(token):
-    return hashlib.sha256(token.strip().upper().encode("utf-8")).hexdigest()
+def respondent_digest(token):
+    return hashlib.sha256(token.encode("utf-8")).hexdigest()
 
 
 def admin_audit(action):
     if os.environ.get("DATABASE_URL"):
         db.session.add(AdminAudit(admin_email=ADMIN_USERNAME or "admin", action=action))
+
+
+def attach_respondent_cookie(response, token):
+    response.set_cookie(
+        RESPONDENT_COOKIE,
+        token,
+        max_age=RESPONDENT_COOKIE_MAX_AGE,
+        httponly=True,
+        secure=bool(os.environ.get("RENDER")) or os.environ.get("FLASK_ENV") == "production",
+        samesite="Lax",
+        path="/",
+    )
+    return response
 
 
 @app.after_request
@@ -128,28 +151,28 @@ def index():
 @limiter.limit("10 per minute", methods=["POST"])
 def feedback():
     if request.method == "GET":
-        return render_template("feedback.html")
+        response = render_template("feedback.html")
+        token = request.cookies.get(RESPONDENT_COOKIE, "")
+        if len(token) < 32 or len(token) > 128:
+            token = secrets.token_urlsafe(32)
+        return attach_respondent_cookie(response, token)
+
     if not os.environ.get("DATABASE_URL"):
         flash("The feedback service is not configured yet. Please try again later.", "error")
         return render_template("feedback.html"), 503
-    # Honeypot catches unsophisticated bots without storing any submitted identity data.
     if request.form.get("website", "").strip():
         return redirect(url_for("feedback_thanks"))
+
+    respondent_token = request.cookies.get(RESPONDENT_COOKIE, "")
+    if len(respondent_token) < 32 or len(respondent_token) > 128:
+        flash("Please scan the dining hall QR code again before submitting.", "error")
+        return redirect(url_for("feedback"))
+
     try:
         meal_type = request.form.get("meal_type", "").strip().lower()
         meal_date = datetime.strptime(request.form.get("meal_date", ""), "%Y-%m-%d").date()
         if meal_type not in {"breakfast", "lunch", "dinner"}:
             raise ValueError("Invalid meal type")
-
-        token = request.form.get("access_code", "").strip().upper()
-        if not token or len(token) > 80:
-            flash("Enter the one-time access code provided for this survey.", "error")
-            return render_template("feedback.html"), 400
-        # Row locking makes simultaneous attempts with the same code serialize in PostgreSQL.
-        access_code = AccessCode.query.filter_by(token_hash=token_digest(token)).with_for_update().first()
-        if access_code is None or access_code.used_at is not None:
-            flash("This access code is invalid or has already been used. Please ask a manager for help.", "error")
-            return render_template("feedback.html"), 400
 
         def rating(name):
             value = int(request.form.get(name, ""))
@@ -160,7 +183,23 @@ def feedback():
         comments = request.form.get("comments", "").strip()
         if len(comments) > 1200:
             raise ValueError("Comments are too long")
-        item = Feedback(
+
+        respondent_hash = respondent_digest(respondent_token)
+        duplicate = AnonymousSubmission.query.filter_by(
+            respondent_hash=respondent_hash,
+            meal_date=meal_date,
+            meal_type=meal_type,
+        ).first()
+        if duplicate is not None:
+            flash("A feedback response from this browser has already been recorded for this meal.", "error")
+            return render_template("feedback.html"), 409
+
+        db.session.add(AnonymousSubmission(
+            respondent_hash=respondent_hash,
+            meal_date=meal_date,
+            meal_type=meal_type,
+        ))
+        db.session.add(Feedback(
             meal_date=meal_date,
             meal_type=meal_type,
             food_rating=rating("food_rating"),
@@ -168,15 +207,17 @@ def feedback():
             variety_rating=rating("variety_rating"),
             cleanliness_rating=rating("cleanliness_rating"),
             comments=comments,
-        )
-        access_code.used_at = datetime.now(timezone.utc)
-        db.session.add(item)
+        ))
         db.session.commit()
         return redirect(url_for("feedback_thanks"))
     except (ValueError, TypeError):
         db.session.rollback()
         flash("Please complete all ratings and choose a valid meal date.", "error")
         return render_template("feedback.html"), 400
+    except IntegrityError:
+        db.session.rollback()
+        flash("A feedback response from this browser has already been recorded for this meal.", "error")
+        return render_template("feedback.html"), 409
     except Exception:
         db.session.rollback()
         app.logger.exception("Could not save feedback")
@@ -220,7 +261,7 @@ def admin_logout():
     return redirect(url_for("index"))
 
 
-def dashboard_response(new_codes=None):
+def dashboard_response():
     if not os.environ.get("DATABASE_URL"):
         abort(503, description="DATABASE_URL is not configured.")
     total = db.session.query(func.count(Feedback.id)).scalar() or 0
@@ -231,10 +272,7 @@ def dashboard_response(new_codes=None):
         "ניקיון": db.session.query(func.avg(Feedback.cleanliness_rating)).scalar(),
     }
     recent = Feedback.query.order_by(Feedback.created_at.desc()).limit(100).all()
-    issued_codes = AccessCode.query.count()
-    used_codes = AccessCode.query.filter(AccessCode.used_at.isnot(None)).count()
-    return render_template("admin.html", total=total, averages=averages, recent=recent,
-                           issued_codes=issued_codes, used_codes=used_codes, new_codes=new_codes or [])
+    return render_template("admin.html", total=total, averages=averages, recent=recent)
 
 
 @app.get("/admin")
@@ -243,28 +281,15 @@ def admin_dashboard():
     return dashboard_response()
 
 
-@app.post("/admin/codes")
+@app.get("/admin/qr.png")
 @admin_required
-@limiter.limit("10 per minute")
-def create_access_codes():
-    if not os.environ.get("DATABASE_URL"):
-        abort(503, description="DATABASE_URL is not configured.")
-    try:
-        count = int(request.form.get("count", "1"))
-        if not 1 <= count <= 100:
-            raise ValueError()
-    except (ValueError, TypeError):
-        flash("אפשר ליצור בין 1 ל־100 קודים בכל פעם.", "error")
-        return redirect(url_for("admin_dashboard"))
-    new_codes = []
-    for _ in range(count):
-        raw = secrets.token_hex(5).upper()
-        db.session.add(AccessCode(token_hash=token_digest(raw)))
-        new_codes.append(raw)
-    admin_audit(f"created_{count}_one_time_codes")
-    db.session.commit()
-    # Plaintext codes are shown once and are not stored in the database.
-    return dashboard_response(new_codes=new_codes)
+def admin_qr_code():
+    public_url = (APP_BASE_URL or request.url_root.rstrip("/")) + url_for("feedback")
+    qr_image = qrcode.make(public_url)
+    image_buffer = io.BytesIO()
+    qr_image.save(image_buffer, format="PNG")
+    image_buffer.seek(0)
+    return send_file(image_buffer, mimetype="image/png", download_name="yeshiva-dining-feedback-qr.png", max_age=0)
 
 
 @app.errorhandler(413)
