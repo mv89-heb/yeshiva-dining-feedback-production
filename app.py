@@ -312,7 +312,7 @@ def feedback():
         return render_template("feedback.html"), 400
     except IntegrityError:
         db.session.rollback()
-        flash("A feedback response from this browser has already been recorded for this meal.", "error")
+        flash(translate("A response from this browser has already been recorded for this meal.", "כבר התקבל משוב מדפדפן זה עבור ארוחה זו."), "error")
         return render_template("feedback.html"), 409
     except Exception:
         db.session.rollback()
