@@ -4,6 +4,7 @@ import io
 import os
 import secrets
 from datetime import datetime, timezone
+from zoneinfo import ZoneInfo
 from functools import wraps
 
 import qrcode
@@ -22,8 +23,12 @@ if database_url.startswith("postgres://"):
     database_url = "postgresql+psycopg://" + database_url[len("postgres://"):]
 elif database_url.startswith("postgresql://") and "+psycopg" not in database_url:
     database_url = "postgresql+psycopg://" + database_url[len("postgresql://"):]
+secret_key = os.environ.get("SECRET_KEY", "").strip()
+if not secret_key and (os.environ.get("RENDER") or os.environ.get("FLASK_ENV") == "production"):
+    raise RuntimeError("SECRET_KEY must be configured in production.")
+
 app.config.update(
-    SECRET_KEY=os.environ.get("SECRET_KEY") or ("dev-only-change-this-secret" if os.environ.get("FLASK_ENV") != "production" and not os.environ.get("RENDER") else secrets.token_hex(32)),
+    SECRET_KEY=secret_key or "dev-only-change-this-secret",
     SQLALCHEMY_DATABASE_URI=database_url or "sqlite:///local-dev.db",
     SQLALCHEMY_TRACK_MODIFICATIONS=False,
     SQLALCHEMY_ENGINE_OPTIONS={"pool_pre_ping": True, "pool_recycle": 300} if database_url else {},
@@ -121,7 +126,12 @@ def secure_headers(response):
 
 @app.context_processor
 def common_template_values():
-    return {"admin_logged_in": bool(session.get("admin_authenticated")), "current_year": datetime.now().year}
+    today = datetime.now(ZoneInfo("Asia/Jerusalem")).date()
+    return {
+        "admin_logged_in": bool(session.get("admin_authenticated")),
+        "current_year": today.year,
+        "current_date": today,
+    }
 
 
 @app.get("/health")
@@ -171,6 +181,9 @@ def feedback():
     try:
         meal_type = request.form.get("meal_type", "").strip().lower()
         meal_date = datetime.strptime(request.form.get("meal_date", ""), "%Y-%m-%d").date()
+        today = datetime.now(ZoneInfo("Asia/Jerusalem")).date()
+        if meal_date != today:
+            raise ValueError("Feedback is accepted only for today's meals.")
         if meal_type not in {"breakfast", "lunch", "dinner"}:
             raise ValueError("Invalid meal type")
 
@@ -238,7 +251,7 @@ def admin_login():
     if request.method == "POST":
         username = request.form.get("username", "").strip()
         password = request.form.get("password", "")
-        if hmac.compare_digest(username, ADMIN_USERNAME) and hmac.compare_digest(password, ADMIN_PASSWORD):
+        if hmac.compare_digest(username.encode("utf-8"), ADMIN_USERNAME.encode("utf-8")) and hmac.compare_digest(password.encode("utf-8"), ADMIN_PASSWORD.encode("utf-8")):
             session.clear()
             session.permanent = True
             session["admin_authenticated"] = True
