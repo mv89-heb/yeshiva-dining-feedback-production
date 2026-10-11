@@ -5,7 +5,9 @@
   <p class="muted">{{ t.management }}</p>
   <h1>{{ "ניהול משתמשים והרשאות" if is_hebrew else "User and permission management" }}</h1>
   <p>{{ "יצירת חשבונות מנהלים, הגדרת הרשאות והשבתת חשבונות. מנהל-העל הקבוע אינו ניתן לשינוי במסך זה." if is_hebrew else "Create manager accounts, assign permissions, and deactivate accounts. The permanent super administrator cannot be changed here." }}</p>
+  {% if current_admin_user and (current_admin_user.is_superadmin or current_admin_user.can_view_feedback) %}
   <a class="btn secondary" href="{{ url_for('admin_dashboard') }}">{{ "חזרה ללוח המשובים" if is_hebrew else "Back to feedback dashboard" }}</a>
+  {% endif %}
 </section>
 <section class="card">
   <h2>{{ "יצירת משתמש חדש" if is_hebrew else "Create a user" }}</h2>
@@ -25,37 +27,26 @@
     <tbody>
     {% for user in users %}
       <tr>
-      <td><strong>{{ user.username }}</strong>{% if user.is_superadmin %}<div class="small muted">{{ "מנהל-על קבוע" if is_hebrew else "Permanent super administrator" }}</div>{% else %}
-        <form id="user-form-{{ user.id }}" method="post" action="{{ url_for('update_admin_user', user_id=user.id) }}"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}"></form>
-      {% endif %}</td>
-      <td>{{ "מנהל-על" if user.is_superadmin and is_hebrew else ("Super administrator" if user.is_superadmin else ("מנהל" if is_hebrew else "Manager")) }}</td>
-      <td>
-      {% if user.is_superadmin %}
-        <span class="small">{{ "כל ההרשאות פעילות" if is_hebrew else "All permissions enabled" }}</span>
-      {% else %}
-          <label style="display:block;margin:.4rem 0"><input form="user-form-{{ user.id }}" type="checkbox" name="can_view_feedback" {% if user.can_view_feedback %}checked{% endif %} style="width:auto"> {{ "צפייה במשובים" if is_hebrew else "View feedback" }}</label>
-          <label style="display:block;margin:.4rem 0"><input form="user-form-{{ user.id }}" type="checkbox" name="can_manage_users" {% if user.can_manage_users %}checked{% endif %} style="width:auto"> {{ "ניהול משתמשים" if is_hebrew else "Manage users" }}</label>
-          <label style="display:block;margin:.4rem 0"><input form="user-form-{{ user.id }}" type="checkbox" name="is_active" {% if user.is_active %}checked{% endif %} style="width:auto"> {{ "חשבון פעיל" if is_hebrew else "Account active" }}</label>
-      </td>
-      <td><input form="user-form-{{ user.id }}" type="password" name="new_password" minlength="12" autocomplete="new-password" placeholder="{{ 'ריק = ללא שינוי' if is_hebrew else 'Leave blank to keep' }}"></td>
-      <td><button form="user-form-{{ user.id }}" class="btn" type="submit">{{ "עדכון" if is_hebrew else "Update" }}</button></td>
-      {% endif %}
+        <td>
+          <strong>{{ user.username }}</strong>
+          {% if user.is_superadmin %}<div class="small muted">{{ "מנהל-על קבוע" if is_hebrew else "Permanent super administrator" }}</div>
+          {% else %}<form id="user-form-{{ user.id }}" method="post" action="{{ url_for('update_admin_user', user_id=user.id) }}"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}"></form>{% endif %}
+        </td>
+        <td>{{ "מנהל-על" if user.is_superadmin and is_hebrew else ("Super administrator" if user.is_superadmin else ("מנהל" if is_hebrew else "Manager")) }}</td>
+        <td>
+          {% if user.is_superadmin %}
+            <span class="small">{{ "כל ההרשאות פעילות" if is_hebrew else "All permissions enabled" }}</span>
+          {% else %}
+            <label style="display:block;margin:.4rem 0"><input form="user-form-{{ user.id }}" type="checkbox" name="can_view_feedback" {% if user.can_view_feedback %}checked{% endif %} style="width:auto"> {{ "צפייה במשובים" if is_hebrew else "View feedback" }}</label>
+            <label style="display:block;margin:.4rem 0"><input form="user-form-{{ user.id }}" type="checkbox" name="can_manage_users" {% if user.can_manage_users %}checked{% endif %} style="width:auto"> {{ "ניהול משתמשים" if is_hebrew else "Manage users" }}</label>
+            <label style="display:block;margin:.4rem 0"><input form="user-form-{{ user.id }}" type="checkbox" name="is_active" {% if user.is_active %}checked{% endif %} style="width:auto"> {{ "חשבון פעיל" if is_hebrew else "Account active" }}</label>
+          {% endif %}
+        </td>
+        <td>{% if not user.is_superadmin %}<input form="user-form-{{ user.id }}" type="password" name="new_password" minlength="12" autocomplete="new-password" placeholder="{{ 'ריק = ללא שינוי' if is_hebrew else 'Leave blank to keep' }}">{% else %}—{% endif %}</td>
+        <td>{% if not user.is_superadmin %}<button form="user-form-{{ user.id }}" class="btn" type="submit">{{ "עדכון" if is_hebrew else "Update" }}</button>{% else %}—{% endif %}</td>
       </tr>
     {% else %}
-        <form method="post" action="{{ url_for('update_admin_user', user_id=user.id) }}">
-          <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-          <label style="display:block;margin:.4rem 0"><input type="checkbox" name="can_view_feedback" {% if user.can_view_feedback %}checked{% endif %} style="width:auto"> {{ "צפייה במשובים" if is_hebrew else "View feedback" }}</label>
-          <label style="display:block;margin:.4rem 0"><input type="checkbox" name="can_manage_users" {% if user.can_manage_users %}checked{% endif %} style="width:auto"> {{ "ניהול משתמשים" if is_hebrew else "Manage users" }}</label>
-          <label style="display:block;margin:.4rem 0"><input type="checkbox" name="is_active" {% if user.is_active %}checked{% endif %} style="width:auto"> {{ "חשבון פעיל" if is_hebrew else "Account active" }}</label>
-      </td>
-      <td>
-          <input type="password" name="new_password" minlength="12" autocomplete="new-password" placeholder="{{ 'ריק = ללא שינוי' if is_hebrew else 'Leave blank to keep' }}">
-      </td>
-      <td><button class="btn" type="submit">{{ "עדכון" if is_hebrew else "Update" }}</button></form></td>
-      {% endif %}
-      </tr>
-    {% else %}
-      <tr><td colspan="5">{{ "אין משתמשים נוספים." if is_hebrew else "No users found." }}</td></tr>
+      <tr><td colspan="5">{{ "אין משתמשים." if is_hebrew else "No users found." }}</td></tr>
     {% endfor %}
     </tbody>
   </table></div>
