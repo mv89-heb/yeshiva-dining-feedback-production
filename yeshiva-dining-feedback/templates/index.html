@@ -1,0 +1,89 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#0f172a">
+  <title>Dining Hall Feedback</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <style>
+    body{font-family:Inter,ui-sans-serif,system-ui,sans-serif;background:radial-gradient(ellipse at top,rgba(251,191,36,.13),transparent 45%),#f8fafc}
+    .meal-option:has(input:checked){background:#0f172a;border-color:#0f172a;color:white}
+    .rating-option:has(input:checked){border-color:#f59e0b;background:#fffbeb;transform:translateY(-3px);box-shadow:0 8px 20px rgba(245,158,11,.14)}
+    .rating-option:focus-within,.meal-option:focus-within{outline:3px solid #fbbf24;outline-offset:3px}
+    .rating-option,.meal-option{transition:all .2s ease}
+    @media(prefers-reduced-motion:reduce){*,*::before,*::after{transition:none!important;animation:none!important}}
+  </style>
+</head>
+<body class="min-h-screen text-slate-900">
+<main class="mx-auto flex min-h-screen max-w-xl items-center justify-center px-4 py-8 sm:px-6">
+  <div class="w-full">
+    <header class="mb-7 text-center">
+      <div class="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-2xl bg-slate-900 text-3xl shadow-lg">🍽️</div>
+      <p class="text-xs font-bold uppercase tracking-[.25em] text-amber-700">Your voice matters</p>
+      <h1 class="mt-2 text-3xl font-black tracking-tight sm:text-4xl">Dining Hall Feedback</h1>
+      <p class="mx-auto mt-3 max-w-sm text-sm leading-6 text-slate-600">Help us make every meal better. It takes less than 30 seconds.</p>
+    </header>
+
+    {% if submitted %}
+    <section class="rounded-3xl border border-emerald-100 bg-white p-8 text-center shadow-xl shadow-slate-200/60" role="status" aria-live="polite">
+      <div class="mx-auto flex h-20 w-20 items-center justify-center rounded-full bg-emerald-50 text-5xl">🎉</div>
+      <h2 class="mt-5 text-2xl font-extrabold">Thank you!</h2>
+      <p class="mt-3 leading-7 text-slate-600">Your feedback has been received. We appreciate you helping us improve the dining experience.</p>
+      <a href="{{ url_for('index') }}" class="mt-7 inline-flex min-h-12 items-center justify-center rounded-xl bg-slate-900 px-6 py-3 font-semibold text-white hover:bg-slate-700 focus:outline-none focus:ring-4 focus:ring-amber-200">Rate another meal</a>
+    </section>
+    {% else %}
+    <section class="rounded-3xl border border-slate-200/80 bg-white p-5 shadow-xl shadow-slate-200/60 sm:p-8">
+      {% with messages = get_flashed_messages(with_categories=true) %}
+      {% if messages %}<div class="mb-5 space-y-2" aria-live="polite">
+        {% for category, message in messages %}<div class="rounded-xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-800">{{ message }}</div>{% endfor %}
+      </div>{% endif %}{% endwith %}
+
+      <form action="{{ url_for('submit_feedback') }}" method="POST" id="feedback-form">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+        <fieldset>
+          <legend class="text-base font-bold">1. Which meal are you rating?</legend>
+          <div class="mt-4 grid grid-cols-3 gap-2">
+            {% for meal in meals %}
+            <label class="meal-option flex min-h-12 cursor-pointer items-center justify-center rounded-xl border border-slate-200 px-2 py-3 text-sm font-semibold text-slate-700 hover:border-slate-400">
+              <input type="radio" name="meal" value="{{ meal }}" class="sr-only" required><span>{{ meal }}</span>
+            </label>
+            {% endfor %}
+          </div>
+        </fieldset>
+        <fieldset class="mt-8">
+          <legend class="text-base font-bold">2. How was the food?</legend>
+          <p class="mt-1 text-sm text-slate-500">Choose one rating.</p>
+          <div class="mt-4 grid grid-cols-5 gap-2">
+            {% for score, details in ratings.items() %}
+            <label class="rating-option flex cursor-pointer flex-col items-center rounded-2xl border-2 border-slate-100 bg-white px-1 py-3 text-center hover:border-amber-300">
+              <input type="radio" name="rating" value="{{ score }}" class="sr-only" required>
+              <span class="text-3xl sm:text-4xl" aria-hidden="true">{{ details.emoji }}</span>
+              <span class="mt-2 text-xs font-bold">{{ score }}</span>
+              <span class="mt-1 text-[10px] leading-tight text-slate-500 sm:text-xs">{{ details.label }}</span>
+            </label>
+            {% endfor %}
+          </div>
+        </fieldset>
+        <div class="mt-8">
+          <label for="comment" class="block text-base font-bold">3. Anything else? <span class="font-normal text-slate-400">(Optional)</span></label>
+          <textarea id="comment" name="comment" rows="3" maxlength="1000" placeholder="What did you enjoy? What could be better?" class="mt-3 w-full resize-y rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm leading-6 outline-none placeholder:text-slate-400 focus:border-amber-400 focus:bg-white focus:ring-4 focus:ring-amber-100"></textarea>
+          <div class="mt-1 text-right text-xs text-slate-400"><span id="char-count">0</span>/1000</div>
+        </div>
+        <button type="submit" id="submit-button" class="mt-6 flex min-h-14 w-full items-center justify-center gap-2 rounded-xl bg-slate-900 px-5 py-4 font-bold text-white shadow-lg transition hover:bg-slate-700 focus:outline-none focus:ring-4 focus:ring-amber-200">
+          <span id="button-text">Submit feedback</span><span aria-hidden="true">→</span>
+        </button>
+        <p class="mt-4 text-center text-xs leading-5 text-slate-400">Your feedback helps improve our meals. Please keep comments respectful.</p>
+      </form>
+    </section>
+    {% endif %}
+    <footer class="mt-6 text-center text-xs text-slate-400">Made for our yeshiva community · {{ current_year }}</footer>
+  </div>
+</main>
+<script>
+const comment=document.getElementById("comment"),counter=document.getElementById("char-count"),form=document.getElementById("feedback-form"),button=document.getElementById("submit-button"),buttonText=document.getElementById("button-text");
+if(comment&&counter)comment.addEventListener("input",()=>counter.textContent=comment.value.length);
+if(form&&button)form.addEventListener("submit",event=>{if(!form.reportValidity()){event.preventDefault();return;}if(button.disabled){event.preventDefault();return;}button.disabled=true;button.setAttribute("aria-busy","true");buttonText.textContent="Submitting…";button.classList.add("opacity-70","cursor-wait");});
+</script>
+</body>
+</html>
