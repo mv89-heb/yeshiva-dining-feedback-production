@@ -195,7 +195,7 @@ def google_callback():
             return render_template("access_denied.html"), 403
         session.clear()
         session["admin_email"] = email
-        session["csrf_token"] = secrets.token_urlsafe(32)
+        session["admin_logout_csrf"] = secrets.token_urlsafe(32)
         if os.environ.get("DATABASE_URL"):
             db.session.add(AdminAudit(admin_email=email, action="login"))
             db.session.commit()
@@ -208,7 +208,7 @@ def google_callback():
 @app.post("/admin/logout")
 @admin_required
 def admin_logout():
-    if not secrets.compare_digest(request.form.get("csrf_token", ""), session.get("csrf_token", "")):
+    if not secrets.compare_digest(request.form.get("csrf_token", ""), session.get("admin_logout_csrf", "")):
         abort(400)
     session.clear()
     return redirect(url_for("index"))
