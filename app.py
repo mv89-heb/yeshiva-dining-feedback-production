@@ -7,7 +7,7 @@ from datetime import datetime, timezone
 from functools import wraps
 
 import qrcode
-from flask import Flask, abort, flash, redirect, render_template, request, send_file, session, url_for
+from flask import Flask, abort, flash, make_response, redirect, render_template, request, send_file, session, url_for
 from flask_limiter import Limiter
 from flask_limiter.util import get_remote_address
 from flask_sqlalchemy import SQLAlchemy
@@ -23,7 +23,7 @@ if database_url.startswith("postgres://"):
 elif database_url.startswith("postgresql://") and "+psycopg" not in database_url:
     database_url = "postgresql+psycopg://" + database_url[len("postgresql://"):]
 app.config.update(
-    SECRET_KEY=os.environ.get("SECRET_KEY") or "dev-only-change-this-secret",
+    SECRET_KEY=os.environ.get("SECRET_KEY") or ("dev-only-change-this-secret" if os.environ.get("FLASK_ENV") != "production" and not os.environ.get("RENDER") else secrets.token_hex(32)),
     SQLALCHEMY_DATABASE_URI=database_url or "sqlite:///local-dev.db",
     SQLALCHEMY_TRACK_MODIFICATIONS=False,
     SQLALCHEMY_ENGINE_OPTIONS={"pool_pre_ping": True, "pool_recycle": 300} if database_url else {},
@@ -151,7 +151,7 @@ def index():
 @limiter.limit("10 per minute", methods=["POST"])
 def feedback():
     if request.method == "GET":
-        response = render_template("feedback.html")
+        response = make_response(render_template("feedback.html"))
         token = request.cookies.get(RESPONDENT_COOKIE, "")
         if len(token) < 32 or len(token) > 128:
             token = secrets.token_urlsafe(32)
