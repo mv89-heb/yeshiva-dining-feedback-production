@@ -20,8 +20,10 @@ jobs:
           python - <<'PY'
           import http.cookiejar
           import os
+          import re
           import time
           import urllib.error
+          import urllib.parse
           import urllib.request
 
           base = os.environ["BASE_URL"].rstrip("/")
@@ -42,9 +44,10 @@ jobs:
                   health = get("/health")
                   ready = get("/ready")
                   feedback = get("/feedback")
-                  if health[0] == 200 and ready[0] == 200 and feedback[0] == 200:
+                  language_switch_ready = b'name="language"' in feedback[3] and b'<html lang="en" dir="ltr">' in feedback[3]
+                  if health[0] == 200 and ready[0] == 200 and feedback[0] == 200 and language_switch_ready:
                       break
-                  last_error = f"/health={health[0]}, /ready={ready[0]}, /feedback={feedback[0]}"
+                  last_error = f"/health={health[0]}, /ready={ready[0]}, /feedback={feedback[0]}, language_switch={language_switch_ready}"
               except Exception as exc:
                   last_error = repr(exc)
               time.sleep(10)
