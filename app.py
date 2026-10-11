@@ -1,16 +1,16 @@
+import hashlib
+import hmac
 import os
 import secrets
 from datetime import datetime, timezone
 from functools import wraps
-from urllib.parse import urljoin
 
-from authlib.integrations.flask_client import OAuth
 from flask import Flask, abort, flash, redirect, render_template, request, session, url_for
 from flask_limiter import Limiter
 from flask_limiter.util import get_remote_address
 from flask_sqlalchemy import SQLAlchemy
 from flask_wtf.csrf import CSRFProtect
-from sqlalchemy import text
+from sqlalchemy import func, text
 from werkzeug.middleware.proxy_fix import ProxyFix
 
 app = Flask(__name__)
@@ -27,22 +27,18 @@ app.config.update(
     SESSION_COOKIE_HTTPONLY=True,
     SESSION_COOKIE_SAMESITE="Lax",
     SESSION_COOKIE_SECURE=bool(os.environ.get("RENDER")) or os.environ.get("FLASK_ENV") == "production",
+    PERMANENT_SESSION_LIFETIME=60 * 60 * 8,
     MAX_CONTENT_LENGTH=32 * 1024,
 )
 app.wsgi_app = ProxyFix(app.wsgi_app, x_for=1, x_proto=1, x_host=1)
 db = SQLAlchemy(app)
 csrf = CSRFProtect(app)
 limiter = Limiter(get_remote_address, app=app, default_limits=[], storage_uri="memory://")
-oauth = OAuth(app)
 
-GOOGLE_CLIENT_ID = os.environ.get("GOOGLE_CLIENT_ID", "").strip()
-GOOGLE_CLIENT_SECRET = os.environ.get("GOOGLE_CLIENT_SECRET", "").strip()
-ADMIN_EMAILS = {x.strip().lower() for x in os.environ.get("ADMIN_EMAILS", "").split(",") if x.strip()}
+ADMIN_USERNAME = os.environ.get("ADMIN_USERNAME", "admin").strip()
+ADMIN_PASSWORD = os.environ.get("ADMIN_PASSWORD", "")
 APP_BASE_URL = os.environ.get("APP_BASE_URL", "").rstrip("/")
-if GOOGLE_CLIENT_ID and GOOGLE_CLIENT_SECRET:
-    oauth.register(name="google", client_id=GOOGLE_CLIENT_ID, client_secret=GOOGLE_CLIENT_SECRET,
-                   server_metadata_url="https://accounts.google.com/.well-known/openid-configuration",
-                   client_kwargs={"scope": "openid email profile"})
+
 
 class Feedback(db.Model):
     id = db.Column(db.Integer, primary_key=True)
@@ -55,21 +51,39 @@ class Feedback(db.Model):
     comments = db.Column(db.String(1200), nullable=False, default="")
     created_at = db.Column(db.DateTime(timezone=True), nullable=False, default=lambda: datetime.now(timezone.utc), index=True)
 
+
+class AccessCode(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    token_hash = db.Column(db.String(64), nullable=False, unique=True, index=True)
+    created_at = db.Column(db.DateTime(timezone=True), nullable=False, default=lambda: datetime.now(timezone.utc))
+    used_at = db.Column(db.DateTime(timezone=True), nullable=True, index=True)
+
+
 class AdminAudit(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     admin_email = db.Column(db.String(320), nullable=False, index=True)
     action = db.Column(db.String(100), nullable=False)
     created_at = db.Column(db.DateTime(timezone=True), nullable=False, default=lambda: datetime.now(timezone.utc))
 
+
 def admin_required(fn):
     @wraps(fn)
     def wrapped(*args, **kwargs):
-        email = (session.get("admin_email") or "").lower()
-        if not email or email not in ADMIN_EMAILS:
-            flash("יש להתחבר באמצעות חשבון מנהל מורשה.", "error")
+        if not session.get("admin_authenticated"):
+            flash("יש להתחבר כדי להיכנס ללוח הניהול.", "error")
             return redirect(url_for("admin_login"))
         return fn(*args, **kwargs)
     return wrapped
+
+
+def token_digest(token):
+    return hashlib.sha256(token.strip().upper().encode("utf-8")).hexdigest()
+
+
+def admin_audit(action):
+    if os.environ.get("DATABASE_URL"):
+        db.session.add(AdminAudit(admin_email=ADMIN_USERNAME or "admin", action=action))
+
 
 @app.after_request
 def secure_headers(response):
@@ -78,15 +92,19 @@ def secure_headers(response):
     response.headers.setdefault("Referrer-Policy", "strict-origin-when-cross-origin")
     response.headers.setdefault("Permissions-Policy", "camera=(), microphone=(), geolocation=()")
     response.headers.setdefault("Content-Security-Policy", "default-src 'self'; style-src 'self' 'unsafe-inline'; form-action 'self'; frame-ancestors 'none'; base-uri 'self'")
+    response.headers.setdefault("Cache-Control", "no-store")
     return response
+
 
 @app.context_processor
 def common_template_values():
-    return {"admin_logged_in": bool(session.get("admin_email") in ADMIN_EMAILS), "current_year": datetime.now().year}
+    return {"admin_logged_in": bool(session.get("admin_authenticated")), "current_year": datetime.now().year}
+
 
 @app.get("/health")
 def health():
     return {"status": "ok", "database_configured": bool(os.environ.get("DATABASE_URL"))}, 200
+
 
 @app.get("/ready")
 def ready():
@@ -100,9 +118,11 @@ def ready():
         app.logger.exception("Readiness database check failed")
         return {"status": "not_ready", "database": "unavailable"}, 503
 
+
 @app.get("/")
 def index():
     return render_template("index.html")
+
 
 @app.route("/feedback", methods=["GET", "POST"])
 @limiter.limit("10 per minute", methods=["POST"])
@@ -112,25 +132,44 @@ def feedback():
     if not os.environ.get("DATABASE_URL"):
         flash("The feedback service is not configured yet. Please try again later.", "error")
         return render_template("feedback.html"), 503
+    # Honeypot catches unsophisticated bots without storing any submitted identity data.
+    if request.form.get("website", "").strip():
+        return redirect(url_for("feedback_thanks"))
     try:
         meal_type = request.form.get("meal_type", "").strip().lower()
         meal_date = datetime.strptime(request.form.get("meal_date", ""), "%Y-%m-%d").date()
         if meal_type not in {"breakfast", "lunch", "dinner"}:
             raise ValueError("Invalid meal type")
+
+        token = request.form.get("access_code", "").strip().upper()
+        if not token or len(token) > 80:
+            flash("Enter the one-time access code provided for this survey.", "error")
+            return render_template("feedback.html"), 400
+        # Row locking makes simultaneous attempts with the same code serialize in PostgreSQL.
+        access_code = AccessCode.query.filter_by(token_hash=token_digest(token)).with_for_update().first()
+        if access_code is None or access_code.used_at is not None:
+            flash("This access code is invalid or has already been used. Please ask a manager for help.", "error")
+            return render_template("feedback.html"), 400
+
         def rating(name):
             value = int(request.form.get(name, ""))
             if not 1 <= value <= 5:
                 raise ValueError("Ratings must be between 1 and 5")
             return value
+
         comments = request.form.get("comments", "").strip()
         if len(comments) > 1200:
             raise ValueError("Comments are too long")
-        if request.form.get("website", "").strip():
-            return redirect(url_for("feedback_thanks"))
-        item = Feedback(meal_date=meal_date, meal_type=meal_type,
-                        food_rating=rating("food_rating"), taste_rating=rating("taste_rating"),
-                        variety_rating=rating("variety_rating"), cleanliness_rating=rating("cleanliness_rating"),
-                        comments=comments)
+        item = Feedback(
+            meal_date=meal_date,
+            meal_type=meal_type,
+            food_rating=rating("food_rating"),
+            taste_rating=rating("taste_rating"),
+            variety_rating=rating("variety_rating"),
+            cleanliness_rating=rating("cleanliness_rating"),
+            comments=comments,
+        )
+        access_code.used_at = datetime.now(timezone.utc)
         db.session.add(item)
         db.session.commit()
         return redirect(url_for("feedback_thanks"))
@@ -144,16 +183,46 @@ def feedback():
         flash("We could not save your feedback. Please try again later.", "error")
         return render_template("feedback.html"), 503
 
+
 @app.get("/feedback/thanks")
 def feedback_thanks():
     return render_template("thanks.html")
 
-@app.get("/admin")
+
+@app.route("/admin/login", methods=["GET", "POST"])
+@limiter.limit("5 per minute", methods=["POST"])
+def admin_login():
+    if not ADMIN_PASSWORD:
+        return render_template("setup_required.html", missing="ADMIN_PASSWORD in Render environment variables"), 503
+    if request.method == "POST":
+        username = request.form.get("username", "").strip()
+        password = request.form.get("password", "")
+        if hmac.compare_digest(username, ADMIN_USERNAME) and hmac.compare_digest(password, ADMIN_PASSWORD):
+            session.clear()
+            session.permanent = True
+            session["admin_authenticated"] = True
+            if os.environ.get("DATABASE_URL"):
+                admin_audit("login")
+                db.session.commit()
+            return redirect(url_for("admin_dashboard"))
+        flash("שם המשתמש או הסיסמה אינם נכונים.", "error")
+        return render_template("admin_login.html"), 401
+    return render_template("admin_login.html")
+
+
+@app.post("/admin/logout")
 @admin_required
-def admin_dashboard():
+def admin_logout():
+    admin_audit("logout")
+    if os.environ.get("DATABASE_URL"):
+        db.session.commit()
+    session.clear()
+    return redirect(url_for("index"))
+
+
+def dashboard_response(new_codes=None):
     if not os.environ.get("DATABASE_URL"):
         abort(503, description="DATABASE_URL is not configured.")
-    from sqlalchemy import func
     total = db.session.query(func.count(Feedback.id)).scalar() or 0
     averages = {
         "איכות האוכל": db.session.query(func.avg(Feedback.food_rating)).scalar(),
@@ -162,64 +231,51 @@ def admin_dashboard():
         "ניקיון": db.session.query(func.avg(Feedback.cleanliness_rating)).scalar(),
     }
     recent = Feedback.query.order_by(Feedback.created_at.desc()).limit(100).all()
-    return render_template("admin.html", total=total, averages=averages, recent=recent)
+    issued_codes = AccessCode.query.count()
+    used_codes = AccessCode.query.filter(AccessCode.used_at.isnot(None)).count()
+    return render_template("admin.html", total=total, averages=averages, recent=recent,
+                           issued_codes=issued_codes, used_codes=used_codes, new_codes=new_codes or [])
 
-@app.get("/admin/login")
-def admin_login():
-    if not GOOGLE_CLIENT_ID or not GOOGLE_CLIENT_SECRET:
-        return render_template("setup_required.html", missing="Google OAuth"), 503
-    if not ADMIN_EMAILS:
-        return render_template("setup_required.html", missing="ADMIN_EMAILS"), 503
-    return render_template("admin_login.html")
 
-@app.get("/admin/login/google")
-@limiter.limit("10 per minute")
-def google_login():
-    if not GOOGLE_CLIENT_ID or not GOOGLE_CLIENT_SECRET:
-        abort(503, description="Google OAuth is not configured.")
-    session.pop("admin_email", None)
-    redirect_uri = urljoin((APP_BASE_URL or request.url_root).rstrip("/") + "/", "admin/callback")
-    return oauth.google.authorize_redirect(redirect_uri, prompt="select_account")
-
-@app.get("/admin/callback")
-def google_callback():
-    if not GOOGLE_CLIENT_ID or not GOOGLE_CLIENT_SECRET:
-        abort(503)
-    try:
-        token = oauth.google.authorize_access_token()
-        userinfo = token.get("userinfo") or oauth.google.userinfo()
-        email = str(userinfo.get("email", "")).strip().lower()
-        verified = userinfo.get("email_verified") is True or userinfo.get("email_verified") == "true"
-        if not verified or email not in ADMIN_EMAILS:
-            session.clear()
-            return render_template("access_denied.html"), 403
-        session.clear()
-        session["admin_email"] = email
-        session["admin_logout_csrf"] = secrets.token_urlsafe(32)
-        if os.environ.get("DATABASE_URL"):
-            db.session.add(AdminAudit(admin_email=email, action="login"))
-            db.session.commit()
-        return redirect(url_for("admin_dashboard"))
-    except Exception:
-        db.session.rollback()
-        app.logger.exception("Google OAuth callback failed")
-        return render_template("setup_required.html", missing="Google OAuth callback configuration"), 503
-
-@app.post("/admin/logout")
+@app.get("/admin")
 @admin_required
-def admin_logout():
-    if not secrets.compare_digest(request.form.get("csrf_token", ""), session.get("admin_logout_csrf", "")):
-        abort(400)
-    session.clear()
-    return redirect(url_for("index"))
+def admin_dashboard():
+    return dashboard_response()
+
+
+@app.post("/admin/codes")
+@admin_required
+@limiter.limit("10 per minute")
+def create_access_codes():
+    if not os.environ.get("DATABASE_URL"):
+        abort(503, description="DATABASE_URL is not configured.")
+    try:
+        count = int(request.form.get("count", "1"))
+        if not 1 <= count <= 100:
+            raise ValueError()
+    except (ValueError, TypeError):
+        flash("אפשר ליצור בין 1 ל־100 קודים בכל פעם.", "error")
+        return redirect(url_for("admin_dashboard"))
+    new_codes = []
+    for _ in range(count):
+        raw = secrets.token_hex(5).upper()
+        db.session.add(AccessCode(token_hash=token_digest(raw)))
+        new_codes.append(raw)
+    admin_audit(f"created_{count}_one_time_codes")
+    db.session.commit()
+    # Plaintext codes are shown once and are not stored in the database.
+    return dashboard_response(new_codes=new_codes)
+
 
 @app.errorhandler(413)
 def too_large(_error):
     return "Request too large.", 413
 
+
 @app.errorhandler(429)
 def rate_limited(_error):
     return render_template("error.html", code=429, message="Too many requests. Please wait and try again."), 429
+
 
 @app.cli.command("init-db")
 def init_db():
@@ -231,8 +287,7 @@ def init_db():
     print("Database tables are ready.")
 
 
-# Bootstrap the initial schema on startup when Neon is configured. create_all is additive
-# and does not delete existing tables or rows; future schema changes should use migrations.
+# create_all adds missing tables and does not delete existing rows.
 if os.environ.get("DATABASE_URL"):
     with app.app_context():
         try:
