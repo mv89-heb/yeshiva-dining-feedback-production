@@ -385,7 +385,7 @@ def admin_login():
         username = request.form.get("username", "").strip()
         password = request.form.get("password", "")
         user = AdminUser.query.filter_by(username=username, is_active=True).first()
-        if user and check_password_hash(user.password_hash, password):
+        if user and check_password_hash(user.password_hash, password) and (user.is_superadmin or user.can_view_feedback or user.can_manage_users):
             preferred_language = session.get("language", "en")
             session.clear()
             session["language"] = preferred_language
@@ -476,6 +476,9 @@ def update_admin_user(user_id):
         return redirect(url_for("admin_users"))
     if actor and actor.id == user.id and request.form.get("is_active") != "on":
         flash(translate("You cannot deactivate your own account.", "לא ניתן להשבית את החשבון שלך בזמן שאתה מחובר."), "error")
+        return redirect(url_for("admin_users"))
+    if actor and actor.id == user.id and request.form.get("can_view_feedback") != "on" and request.form.get("can_manage_users") != "on":
+        flash(translate("Keep at least one permission on your own account.", "יש להשאיר לפחות הרשאה אחת בחשבון שלך."), "error")
         return redirect(url_for("admin_users"))
     new_password = request.form.get("new_password", "")
     if new_password and len(new_password) < 12:
