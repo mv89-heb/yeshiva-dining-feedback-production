@@ -56,7 +56,7 @@ class AdminPermissionTests(unittest.TestCase):
         self.login("admin", "StrongTestPassword1!")
         response = self.client.get("/admin")
         self.assertEqual(response.status_code, 200)
-        self.assertIn("ניהול משתמשים והרשאות".encode("utf-8"), response.data)
+        self.assertIn(b"User and permission management", response.data)
 
     def test_viewer_can_see_feedback_but_cannot_manage_users(self):
         self.login("viewer", "ViewerTestPassword1!")
