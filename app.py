@@ -2,6 +2,7 @@ import hashlib
 import hmac
 import io
 import os
+import re
 import secrets
 from datetime import datetime, timezone
 from zoneinfo import ZoneInfo
@@ -16,6 +17,7 @@ from flask_wtf.csrf import CSRFProtect
 from sqlalchemy import UniqueConstraint, func, text
 from sqlalchemy.exc import IntegrityError
 from werkzeug.middleware.proxy_fix import ProxyFix
+from werkzeug.security import check_password_hash, generate_password_hash
 
 app = Flask(__name__)
 database_url = os.environ.get("DATABASE_URL", "").strip()
@@ -81,14 +83,57 @@ class AdminAudit(db.Model):
     created_at = db.Column(db.DateTime(timezone=True), nullable=False, default=lambda: datetime.now(timezone.utc))
 
 
+class AdminUser(db.Model):
+    __tablename__ = "admin_users"
+    id = db.Column(db.Integer, primary_key=True)
+    username = db.Column(db.String(100), nullable=False, unique=True, index=True)
+    password_hash = db.Column(db.String(255), nullable=False)
+    role = db.Column(db.String(20), nullable=False, default="manager")
+    is_active = db.Column(db.Boolean, nullable=False, default=True)
+    can_view_feedback = db.Column(db.Boolean, nullable=False, default=True)
+    can_manage_users = db.Column(db.Boolean, nullable=False, default=False)
+    created_at = db.Column(db.DateTime(timezone=True), nullable=False, default=lambda: datetime.now(timezone.utc))
+    created_by = db.Column(db.String(100), nullable=False, default="system")
+
+    @property
+    def is_superadmin(self):
+        return self.role == "superadmin"
+
+
+def current_admin_user():
+    user_id = session.get("admin_user_id")
+    if not user_id:
+        return None
+    user = db.session.get(AdminUser, user_id)
+    if user is None or not user.is_active:
+        session.clear()
+        return None
+    return user
+
+
 def admin_required(fn):
     @wraps(fn)
     def wrapped(*args, **kwargs):
-        if not session.get("admin_authenticated"):
+        if current_admin_user() is None:
             flash(translate("Please sign in to access the admin dashboard.", "יש להתחבר כדי להיכנס ללוח הניהול."), "error")
             return redirect(url_for("admin_login"))
         return fn(*args, **kwargs)
     return wrapped
+
+
+def permission_required(permission):
+    def decorator(fn):
+        @wraps(fn)
+        def wrapped(*args, **kwargs):
+            user = current_admin_user()
+            if user is None:
+                flash(translate("Please sign in to access the admin dashboard.", "יש להתחבר כדי להיכנס ללוח הניהול."), "error")
+                return redirect(url_for("admin_login"))
+            if not user.is_superadmin and not getattr(user, permission, False):
+                abort(403)
+            return fn(*args, **kwargs)
+        return wrapped
+    return decorator
 
 
 def respondent_digest(token):
@@ -97,7 +142,7 @@ def respondent_digest(token):
 
 def admin_audit(action):
     if os.environ.get("DATABASE_URL"):
-        db.session.add(AdminAudit(admin_email=ADMIN_USERNAME or "admin", action=action))
+        db.session.add(AdminAudit(admin_email=session.get("admin_username", ADMIN_USERNAME or "admin"), action=action))
 
 
 def attach_respondent_cookie(response, token):
@@ -135,6 +180,8 @@ def common_template_values():
     translations = {
         "site_name": "Yeshiva Dining" if language == "en" else "חדר האוכל בישיבה",
         "admin_dashboard": "Admin dashboard" if language == "en" else "לוח ניהול",
+        "admin_users": "User management" if language == "en" else "ניהול משתמשים",
+        "manage_users": "Manage users and permissions" if language == "en" else "ניהול משתמשים והרשאות",
         "home_tagline": "YOUR VOICE HELPS US IMPROVE" if language == "en" else "המשוב שלכם עוזר לנו להשתפר",
         "home_title": "How was your meal?" if language == "en" else "איך הייתה הארוחה?",
         "home_intro": "Share quick, honest feedback about the food, taste, variety, and dining hall cleanliness. Your feedback helps us make every meal better." if language == "en" else "שתפו משוב קצר וכנה על האוכל, הטעם, המגוון והניקיון בחדר האוכל. המשוב שלכם עוזר לנו לשפר כל ארוחה.",
@@ -196,8 +243,11 @@ def common_template_values():
         "language_label": "Language" if language == "en" else "שפה",
         "switch_language": "עברית" if language == "en" else "English",
     }
+    current_user = current_admin_user() if session.get("admin_user_id") else None
     return {
-        "admin_logged_in": bool(session.get("admin_authenticated")),
+        "current_admin_user": current_user,
+        "admin_logged_in": current_user is not None,
+        "can_manage_users": bool(current_user and (current_user.is_superadmin or current_user.can_manage_users)),
         "current_year": today.year,
         "current_date": today,
         "language": language,
@@ -329,21 +379,23 @@ def feedback_thanks():
 @app.route("/admin/login", methods=["GET", "POST"])
 @limiter.limit("5 per minute", methods=["POST"])
 def admin_login():
-    if not ADMIN_PASSWORD:
-        return render_template("setup_required.html", missing="ADMIN_PASSWORD in Render environment variables"), 503
+    if not os.environ.get("DATABASE_URL"):
+        return render_template("setup_required.html", missing="DATABASE_URL in Render environment variables"), 503
     if request.method == "POST":
         username = request.form.get("username", "").strip()
         password = request.form.get("password", "")
-        if hmac.compare_digest(username.encode("utf-8"), ADMIN_USERNAME.encode("utf-8")) and hmac.compare_digest(password.encode("utf-8"), ADMIN_PASSWORD.encode("utf-8")):
+        user = AdminUser.query.filter_by(username=username, is_active=True).first()
+        if user and check_password_hash(user.password_hash, password):
             preferred_language = session.get("language", "en")
             session.clear()
             session["language"] = preferred_language
             session.permanent = True
             session["admin_authenticated"] = True
-            if os.environ.get("DATABASE_URL"):
-                admin_audit("login")
-                db.session.commit()
-            return redirect(url_for("admin_dashboard"))
+            session["admin_user_id"] = user.id
+            session["admin_username"] = user.username
+            admin_audit("login")
+            db.session.commit()
+            return redirect(url_for("admin_dashboard") if (user.is_superadmin or user.can_view_feedback) else url_for("admin_users"))
         flash(translate("The username or password is incorrect.", "שם המשתמש או הסיסמה אינם נכונים."), "error")
         return render_template("admin_login.html"), 401
     return render_template("admin_login.html")
@@ -376,13 +428,72 @@ def dashboard_response():
 
 
 @app.get("/admin")
-@admin_required
+@permission_required("can_view_feedback")
 def admin_dashboard():
     return dashboard_response()
 
 
+@app.route("/admin/users", methods=["GET", "POST"])
+@permission_required("can_manage_users")
+def admin_users():
+    if request.method == "POST":
+        username = request.form.get("username", "").strip()
+        password = request.form.get("password", "")
+        if not re.fullmatch(r"[A-Za-z0-9_.-]{3,100}", username):
+            flash(translate("Username must be 3–100 characters using letters, numbers, dot, underscore, or hyphen.", "שם המשתמש חייב להכיל 3–100 תווים באנגלית, מספרים, נקודה, קו תחתון או מקף."), "error")
+        elif len(password) < 12:
+            flash(translate("Use a password of at least 12 characters.", "יש לבחור סיסמה באורך 12 תווים לפחות."), "error")
+        elif AdminUser.query.filter_by(username=username).first():
+            flash(translate("That username already exists.", "שם המשתמש כבר קיים."), "error")
+        else:
+            user = AdminUser(
+                username=username,
+                password_hash=generate_password_hash(password),
+                role="manager",
+                is_active=True,
+                can_view_feedback=request.form.get("can_view_feedback") == "on",
+                can_manage_users=request.form.get("can_manage_users") == "on",
+                created_by=session.get("admin_username", "admin"),
+            )
+            db.session.add(user)
+            admin_audit("created user " + username)
+            db.session.commit()
+            flash(translate("User created.", "המשתמש נוצר בהצלחה."), "success")
+            return redirect(url_for("admin_users"))
+    users = AdminUser.query.order_by(AdminUser.role.desc(), AdminUser.username.asc()).all()
+    return render_template("admin_users.html", users=users)
+
+
+@app.post("/admin/users/<int:user_id>/update")
+@permission_required("can_manage_users")
+def update_admin_user(user_id):
+    user = db.session.get(AdminUser, user_id)
+    if user is None:
+        abort(404)
+    actor = current_admin_user()
+    if user.is_superadmin:
+        flash(translate("The permanent super administrator cannot be changed here.", "לא ניתן לשנות כאן את מנהל-העל הקבוע."), "error")
+        return redirect(url_for("admin_users"))
+    if actor and actor.id == user.id and request.form.get("is_active") != "on":
+        flash(translate("You cannot deactivate your own account.", "לא ניתן להשבית את החשבון שלך בזמן שאתה מחובר."), "error")
+        return redirect(url_for("admin_users"))
+    new_password = request.form.get("new_password", "")
+    if new_password and len(new_password) < 12:
+        flash(translate("New passwords must be at least 12 characters.", "סיסמה חדשה חייבת להכיל לפחות 12 תווים."), "error")
+        return redirect(url_for("admin_users"))
+    user.can_view_feedback = request.form.get("can_view_feedback") == "on"
+    user.can_manage_users = request.form.get("can_manage_users") == "on"
+    user.is_active = request.form.get("is_active") == "on"
+    if new_password:
+        user.password_hash = generate_password_hash(new_password)
+    admin_audit("updated user " + user.username)
+    db.session.commit()
+    flash(translate("User permissions updated.", "הרשאות המשתמש עודכנו."), "success")
+    return redirect(url_for("admin_users"))
+
+
 @app.get("/admin/qr.png")
-@admin_required
+@permission_required("can_view_feedback")
 def admin_qr_code():
     public_url = (APP_BASE_URL or request.url_root.rstrip("/")) + url_for("feedback")
     qr_image = qrcode.make(public_url)
@@ -412,11 +523,24 @@ def init_db():
     print("Database tables are ready.")
 
 
-# create_all adds missing tables and does not delete existing rows.
+# create_all adds missing tables and does not delete existing rows. Seed the permanent
+# bootstrap administrator once; subsequent password/permission changes live in the database.
 if os.environ.get("DATABASE_URL"):
     with app.app_context():
         try:
             db.create_all()
+            if ADMIN_PASSWORD and not AdminUser.query.filter_by(username=ADMIN_USERNAME).first():
+                db.session.add(AdminUser(
+                    username=ADMIN_USERNAME or "admin",
+                    password_hash=generate_password_hash(ADMIN_PASSWORD),
+                    role="superadmin",
+                    is_active=True,
+                    can_view_feedback=True,
+                    can_manage_users=True,
+                    created_by="environment-bootstrap",
+                ))
+                db.session.commit()
+                app.logger.info("Bootstrap administrator created from Render environment settings.")
             app.logger.info("Database schema is available.")
         except Exception:
             db.session.rollback()
