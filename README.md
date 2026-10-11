@@ -48,4 +48,4 @@ Production uses Gunicorn via render.yaml.
 ## Notes
 - Free Render services may sleep while idle.
 - Rate limiting currently uses per-process memory storage; use shared Redis-compatible storage for robust multi-instance throttling.
-- Before broad public use, add CSRF protection to the public feedback form (for example Flask-WTF); admin logout already validates a CSRF token.
+- Flask-WTF CSRF protection is enabled on POST forms, including student feedback and admin logout.
