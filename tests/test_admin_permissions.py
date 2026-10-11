@@ -54,14 +54,15 @@ class AdminPermissionTests(unittest.TestCase):
 
     def test_superadmin_can_open_user_management(self):
         self.login("admin", "StrongTestPassword1!")
-        response = self.client.get("/admin/users")
+        response = self.client.get("/admin")
         self.assertEqual(response.status_code, 200)
-        self.assertIn(b"User and permission management", response.data)
+        self.assertIn("ניהול משתמשים והרשאות".encode("utf-8"), response.data)
 
     def test_viewer_can_see_feedback_but_cannot_manage_users(self):
         self.login("viewer", "ViewerTestPassword1!")
         self.assertEqual(self.client.get("/admin").status_code, 200)
         self.assertEqual(self.client.get("/admin/users").status_code, 403)
+        self.assertEqual(self.client.get("/admin").status_code, 200)
 
     def test_disabled_user_cannot_log_in(self):
         response = self.login("disabled", "DisabledTestPassword1!")
