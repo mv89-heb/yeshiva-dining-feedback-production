@@ -1,0 +1,70 @@
+name: Production smoke test
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  smoke-test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    steps:
+      - name: Wait for production endpoints and test access boundaries
+        env:
+          BASE_URL: https://yeshiva-dining-feedback-production.onrender.com
+        run: |
+          python - <<'PY'
+          import http.cookiejar
+          import os
+          import time
+          import urllib.error
+          import urllib.request
+
+          base = os.environ["BASE_URL"].rstrip("/")
+          jar = http.cookiejar.CookieJar()
+          opener = urllib.request.build_opener(urllib.request.HTTPCookieProcessor(jar))
+
+          def get(path, timeout=15):
+              req = urllib.request.Request(base + path, headers={"User-Agent": "YeshivaDining-SmokeTest/1.0"})
+              try:
+                  with opener.open(req, timeout=timeout) as response:
+                      return response.status, response.geturl(), response.headers, response.read(200_000)
+              except urllib.error.HTTPError as exc:
+                  return exc.code, exc.geturl(), exc.headers, exc.read(200_000)
+
+          last_error = None
+          for attempt in range(36):
+              try:
+                  health = get("/health")
+                  ready = get("/ready")
+                  feedback = get("/feedback")
+                  if health[0] == 200 and ready[0] == 200 and feedback[0] == 200:
+                      break
+                  last_error = f"/health={health[0]}, /ready={ready[0]}, /feedback={feedback[0]}"
+              except Exception as exc:
+                  last_error = repr(exc)
+              time.sleep(10)
+          else:
+              raise SystemExit(f"Production did not become ready after retries: {last_error}")
+
+          assert b'"status": "ok"' in health[3] or b'"status":"ok"' in health[3], "health endpoint did not return expected JSON"
+          assert b'"status": "ready"' in ready[3] or b'"status":"ready"' in ready[3], "database readiness check did not pass"
+          assert b'name="csrf_token"' in feedback[3], "feedback form or CSRF token missing"
+          assert any(cookie.name == "dining_respondent" for cookie in jar), "anonymous browser token cookie was not set"
+
+          login = get("/admin/login")
+          assert login[0] == 200, f"admin login is not configured correctly: HTTP {login[0]}"
+          assert b'name="username"' in login[3] and b'name="password"' in login[3], "admin login form missing credentials fields"
+
+          admin = get("/admin")
+          assert admin[0] == 200 and admin[1].rstrip("/").endswith("/admin/login"), "admin dashboard was not protected by login"
+          qr = get("/admin/qr.png")
+          assert qr[0] == 200 and qr[1].rstrip("/").endswith("/admin/login"), "QR endpoint was not protected by login"
+
+          print("PASS: /health, /ready (Neon), /feedback + anonymous cookie + CSRF, manager login, and unauthenticated admin/QR protection.")
+          print("No feedback was submitted; the smoke test is read-only.")
+          PY
