@@ -151,7 +151,7 @@ def feedback_thanks():
 @app.get("/admin")
 @admin_required
 def admin_dashboard():
-    if not app.config["SQLALCHEMY_DATABASE_URI"]:
+    if not os.environ.get("DATABASE_URL"):
         abort(503, description="DATABASE_URL is not configured.")
     from sqlalchemy import func
     total = db.session.query(func.count(Feedback.id)).scalar() or 0
