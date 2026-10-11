@@ -479,17 +479,17 @@ def update_admin_user(user_id):
     actor = current_admin_user()
     if user.is_superadmin:
         flash(translate("The permanent super administrator cannot be changed here.", "לא ניתן לשנות כאן את מנהל-העל הקבוע."), "error")
-        return redirect(url_for("admin_users"))
+        return redirect(url_for("admin_dashboard"))
     if actor and actor.id == user.id and request.form.get("is_active") != "on":
         flash(translate("You cannot deactivate your own account.", "לא ניתן להשבית את החשבון שלך בזמן שאתה מחובר."), "error")
-        return redirect(url_for("admin_users"))
+        return redirect(url_for("admin_dashboard"))
     if actor and actor.id == user.id and request.form.get("can_view_feedback") != "on" and request.form.get("can_manage_users") != "on":
         flash(translate("Keep at least one permission on your own account.", "יש להשאיר לפחות הרשאה אחת בחשבון שלך."), "error")
-        return redirect(url_for("admin_users"))
+        return redirect(url_for("admin_dashboard"))
     new_password = request.form.get("new_password", "")
     if new_password and len(new_password) < 12:
         flash(translate("New passwords must be at least 12 characters.", "סיסמה חדשה חייבת להכיל לפחות 12 תווים."), "error")
-        return redirect(url_for("admin_users"))
+        return redirect(url_for("admin_dashboard"))
     user.can_view_feedback = request.form.get("can_view_feedback") == "on"
     user.can_manage_users = request.form.get("can_manage_users") == "on"
     user.is_active = request.form.get("is_active") == "on"
@@ -498,7 +498,7 @@ def update_admin_user(user_id):
     admin_audit("updated user " + user.username)
     db.session.commit()
     flash(translate("User permissions updated.", "הרשאות המשתמש עודכנו."), "success")
-    return redirect(url_for("admin_users"))
+    return redirect(url_for("admin_dashboard"))
 
 
 @app.get("/admin/qr.png")
