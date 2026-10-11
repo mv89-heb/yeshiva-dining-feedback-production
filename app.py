@@ -9,6 +9,7 @@ from flask import Flask, abort, flash, redirect, render_template, request, sessi
 from flask_limiter import Limiter
 from flask_limiter.util import get_remote_address
 from flask_sqlalchemy import SQLAlchemy
+from flask_wtf.csrf import CSRFProtect
 from sqlalchemy import text
 from werkzeug.middleware.proxy_fix import ProxyFix
 
@@ -20,7 +21,7 @@ elif database_url.startswith("postgresql://") and "+psycopg" not in database_url
     database_url = "postgresql+psycopg://" + database_url[len("postgresql://"):]
 app.config.update(
     SECRET_KEY=os.environ.get("SECRET_KEY") or "dev-only-change-this-secret",
-    SQLALCHEMY_DATABASE_URI=database_url or None,
+    SQLALCHEMY_DATABASE_URI=database_url or "sqlite:///local-dev.db",
     SQLALCHEMY_TRACK_MODIFICATIONS=False,
     SQLALCHEMY_ENGINE_OPTIONS={"pool_pre_ping": True, "pool_recycle": 300} if database_url else {},
     SESSION_COOKIE_HTTPONLY=True,
@@ -30,6 +31,7 @@ app.config.update(
 )
 app.wsgi_app = ProxyFix(app.wsgi_app, x_for=1, x_proto=1, x_host=1)
 db = SQLAlchemy(app)
+csrf = CSRFProtect(app)
 limiter = Limiter(get_remote_address, app=app, default_limits=[], storage_uri="memory://")
 oauth = OAuth(app)
 
@@ -84,11 +86,11 @@ def common_template_values():
 
 @app.get("/health")
 def health():
-    return {"status": "ok", "database_configured": bool(app.config["SQLALCHEMY_DATABASE_URI"])}, 200
+    return {"status": "ok", "database_configured": bool(os.environ.get("DATABASE_URL"))}, 200
 
 @app.get("/ready")
 def ready():
-    if not app.config["SQLALCHEMY_DATABASE_URI"]:
+    if not os.environ.get("DATABASE_URL"):
         return {"status": "not_ready", "reason": "DATABASE_URL is not configured"}, 503
     try:
         db.session.execute(text("SELECT 1"))
@@ -107,7 +109,7 @@ def index():
 def feedback():
     if request.method == "GET":
         return render_template("feedback.html")
-    if not app.config["SQLALCHEMY_DATABASE_URI"]:
+    if not os.environ.get("DATABASE_URL"):
         flash("The feedback service is not configured yet. Please try again later.", "error")
         return render_template("feedback.html"), 503
     try:
@@ -194,7 +196,7 @@ def google_callback():
         session.clear()
         session["admin_email"] = email
         session["csrf_token"] = secrets.token_urlsafe(32)
-        if app.config["SQLALCHEMY_DATABASE_URI"]:
+        if os.environ.get("DATABASE_URL"):
             db.session.add(AdminAudit(admin_email=email, action="login"))
             db.session.commit()
         return redirect(url_for("admin_dashboard"))
