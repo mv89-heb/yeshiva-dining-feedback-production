@@ -19,7 +19,7 @@
   </div>
   <div class="form-section">
     <div class="section-heading"><span class="section-number">02</span><div><h2>{{ "Rate your experience" if not is_hebrew else "איך הייתה החוויה?" }}</h2><p class="muted small">{{ "Tap one number for each category — 1 is poor, 5 is excellent." if not is_hebrew else "בחרו מספר אחד בכל סעיף — 1 נמוך, 5 מצוין." }}</p></div></div>
-    {% for name,key in [('food_rating','food_quality'),('taste_rating','taste'),('variety_rating','variety'),('cleanliness_rating','cleanliness') %}
+    {% for name,key in [('food_rating','food_quality'),('taste_rating','taste'),('variety_rating','variety'),('cleanliness_rating','cleanliness')] %}
     <fieldset class="field rating-field" style="border:0;padding:0">
       <legend>{{ t[key] }} <span class="required-star" aria-hidden="true">*</span></legend>
       <div class="rating" role="radiogroup" aria-label="{{ t[key] }}">{% for n in range(1,6) %}<label><input type="radio" name="{{ name }}" value="{{ n }}" required><span>{{ n }}</span></label>{% endfor %}</div>
