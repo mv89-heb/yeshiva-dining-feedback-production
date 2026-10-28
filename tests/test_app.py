@@ -7,7 +7,8 @@ import unittest
 from datetime import datetime
 from zoneinfo import ZoneInfo
 
-from app import app, db, Feedback, AnonymousSubmission
+from app import app, db, Feedback, AnonymousSubmission, AdminUser
+from werkzeug.security import generate_password_hash
 
 
 class AnonymousSubmissionLimitTests(unittest.TestCase):
@@ -139,6 +140,34 @@ class AnonymousSubmissionLimitTests(unittest.TestCase):
         }, follow_redirects=False)
         self.assertEqual(response.status_code, 302)
         self.assertEqual(response.headers["Location"], "/feedback")
+
+    def test_public_templates_render(self):
+        for path in ("/", "/feedback/thanks", "/admin/login"):
+            with self.subTest(path=path):
+                response = self.client.get(path)
+                self.assertEqual(response.status_code, 200)
+                self.assertIn(b"<!doctype html>", response.data.lower())
+
+    def test_admin_dashboard_template_renders_after_login(self):
+        with app.app_context():
+            db.session.add(AdminUser(
+                username="design-admin",
+                password_hash=generate_password_hash("LongSecurePassword123!"),
+                role="superadmin",
+                is_active=True,
+                can_view_feedback=True,
+                can_manage_users=True,
+            ))
+            db.session.commit()
+
+        login = self.client.post("/admin/login", data={
+            "username": "design-admin",
+            "password": "LongSecurePassword123!",
+        }, follow_redirects=False)
+        self.assertEqual(login.status_code, 302)
+        dashboard = self.client.get("/admin")
+        self.assertEqual(dashboard.status_code, 200)
+        self.assertIn(b"User and permission management", dashboard.data)
 
 if __name__ == "__main__":
     unittest.main()
