@@ -82,6 +82,23 @@ class AdminPermissionTests(unittest.TestCase):
             self.assertTrue(admin.is_active)
             self.assertEqual(admin.role, "superadmin")
 
+    def test_viewer_cannot_change_another_users_permissions(self):
+        self.login("viewer", "ViewerTestPassword1!")
+        with app.app_context():
+            disabled_id = AdminUser.query.filter_by(username="disabled").one().id
+
+        response = self.client.post(f"/admin/users/{disabled_id}/update", data={
+            "can_view_feedback": "on",
+            "can_manage_users": "on",
+            "is_active": "on",
+        }, follow_redirects=False)
+        self.assertEqual(response.status_code, 403)
+
+        with app.app_context():
+            disabled = AdminUser.query.filter_by(username="disabled").one()
+            self.assertFalse(disabled.is_active)
+            self.assertFalse(disabled.can_manage_users)
+
 
 if __name__ == "__main__":
     unittest.main()

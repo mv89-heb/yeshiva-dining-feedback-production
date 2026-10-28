@@ -102,6 +102,27 @@ class AnonymousSubmissionLimitTests(unittest.TestCase):
         with app.app_context():
             self.assertEqual(Feedback.query.count(), 0)
 
+    def test_invalid_rating_rolls_back_and_does_not_block_valid_retry(self):
+        invalid = self.client.post("/feedback", data={
+            "meal_date": self.today,
+            "meal_type": "lunch",
+            "food_rating": "6",
+            "taste_rating": "4",
+            "variety_rating": "3",
+            "cleanliness_rating": "5",
+            "comments": "",
+        })
+        self.assertEqual(invalid.status_code, 400)
+        with app.app_context():
+            self.assertEqual(Feedback.query.count(), 0)
+            self.assertEqual(AnonymousSubmission.query.count(), 0)
+
+        valid = self.submit(self.client, "lunch")
+        self.assertEqual(valid.status_code, 302)
+        with app.app_context():
+            self.assertEqual(Feedback.query.count(), 1)
+            self.assertEqual(AnonymousSubmission.query.count(), 1)
+
 
 if __name__ == "__main__":
     unittest.main()
