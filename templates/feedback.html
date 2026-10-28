@@ -1,1 +1,40 @@
-{% extends "base.html" %}{% block title %}{{ t.give_feedback }} · {{ t.site_name }}{% endblock %}{% block content %}<section class="hero"><p class="muted">{{ t.feedback_kicker }}</p><h1>{{ t.feedback_title }}</h1><p class="muted">{{ t.feedback_intro }}</p></section><form class="card" method="post" action="{{ url_for('feedback') }}"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><div class="honeypot" aria-hidden="true"><label>Leave this empty<input name="website" tabindex="-1" autocomplete="off"></label></div><div class="grid"><div class="field"><label for="meal_date">{{ t.meal_date }}</label><input id="meal_date" name="meal_date" type="date" value="{{ current_date.isoformat() }}" min="{{ current_date.isoformat() }}" max="{{ current_date.isoformat() }}" required></div><div class="field"><label for="meal_type">{{ t.which_meal }}</label><select id="meal_type" name="meal_type" required><option value="">{{ t.choose_meal }}</option><option value="breakfast">{{ t.breakfast }}</option><option value="lunch">{{ t.lunch }}</option><option value="dinner">{{ t.dinner }}</option></select></div></div>{% for name,key in [('food_rating','food_quality'),('taste_rating','taste'),('variety_rating','variety'),('cleanliness_rating','cleanliness')] %}<fieldset class="field" style="border:0;padding:0"><legend>{{ t[key] }} *</legend><div class="rating">{% for n in range(1,6) %}<label><input type="radio" name="{{ name }}" value="{{ n }}" required>{{ n }}</label>{% endfor %}</div><div class="muted small">{{ t.poor_excellent }}</div></fieldset>{% endfor %}<div class="field"><label for="comments">{{ t.comments_label }}</label><textarea id="comments" name="comments" maxlength="1200" placeholder="{{ t.comments_placeholder }}"></textarea></div><button class="btn" type="submit">{{ t.submit_feedback }}</button></form>{% endblock %}
+{% extends "base.html" %}
+{% block title %}{{ t.give_feedback }} · {{ t.site_name }}{% endblock %}
+{% block content %}
+<section class="hero feedback-hero">
+  <p class="eyebrow">{{ t.feedback_kicker }}</p>
+  <h1>{{ t.feedback_title }}</h1>
+  <p class="muted">{{ t.feedback_intro }}</p>
+  <div class="time-note"><span aria-hidden="true">◷</span> {{ "Takes about a minute" if not is_hebrew else "דקה אחת וזהו" }} <span class="time-dot">•</span> {{ "Anonymous" if not is_hebrew else "אנונימי" }}</div>
+</section>
+<form class="card feedback-form" method="post" action="{{ url_for('feedback') }}">
+  <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+  <div class="honeypot" aria-hidden="true"><label>Leave this empty<input name="website" tabindex="-1" autocomplete="off"></label></div>
+  <div class="form-section">
+    <div class="section-heading"><span class="section-number">01</span><div><h2>{{ "The meal" if not is_hebrew else "פרטי הארוחה" }}</h2><p class="muted small">{{ "Choose which meal you are rating." if not is_hebrew else "בחרו איזו ארוחה אתם מדרגים." }}</p></div></div>
+    <div class="grid">
+      <div class="field"><label for="meal_date">{{ t.meal_date }}</label><input id="meal_date" name="meal_date" type="date" value="{{ current_date.isoformat() }}" min="{{ current_date.isoformat() }}" max="{{ current_date.isoformat() }}" required></div>
+      <div class="field"><label for="meal_type">{{ t.which_meal }}</label><select id="meal_type" name="meal_type" required><option value="">{{ t.choose_meal }}</option><option value="breakfast">{{ t.breakfast }}</option><option value="lunch">{{ t.lunch }}</option><option value="dinner">{{ t.dinner }}</option></select></div>
+    </div>
+  </div>
+  <div class="form-section">
+    <div class="section-heading"><span class="section-number">02</span><div><h2>{{ "Rate your experience" if not is_hebrew else "איך הייתה החוויה?" }}</h2><p class="muted small">{{ "Tap one number for each category — 1 is poor, 5 is excellent." if not is_hebrew else "בחרו מספר אחד בכל סעיף — 1 נמוך, 5 מצוין." }}</p></div></div>
+    {% for name,key in [('food_rating','food_quality'),('taste_rating','taste'),('variety_rating','variety'),('cleanliness_rating','cleanliness')] %}
+    <fieldset class="field rating-field" style="border:0;padding:0">
+      <legend>{{ t[key] }} <span class="required-star" aria-hidden="true">*</span></legend>
+      <div class="rating" role="radiogroup" aria-label="{{ t[key] }}">{% for n in range(1,6) %}<label><input type="radio" name="{{ name }}" value="{{ n }}" required><span>{{ n }}</span></label>{% endfor %}</div>
+      <div class="rating-ends"><span>{{ "Needs work" if not is_hebrew else "טעון שיפור" }}</span><span>{{ "Excellent" if not is_hebrew else "מצוין" }}</span></div>
+    </fieldset>
+    {% endfor %}
+  </div>
+  <div class="form-section comments-section">
+    <div class="section-heading"><span class="section-number">03</span><div><h2>{{ t.comments_label }}</h2><p class="muted small">{{ "Anything we should know? This is optional." if not is_hebrew else "יש משהו שחשוב שנדע? זה לא חובה." }}</p></div></div>
+    <div class="field"><label for="comments" class="visually-hidden">{{ t.comments_label }}</label><textarea id="comments" name="comments" maxlength="1200" placeholder="{{ t.comments_placeholder }}"></textarea></div>
+  </div>
+  <div class="submit-row"><p class="privacy-note"><span aria-hidden="true">◇</span> {{ "No name or student ID needed." if not is_hebrew else "אין צורך בשם או במספר תלמיד." }}</p><button class="btn submit-btn" type="submit">{{ t.submit_feedback }} <span aria-hidden="true">↗</span></button></div>
+</form>
+<style>
+.feedback-hero{padding-bottom:1rem}.feedback-hero h1{max-width:20ch}.time-note{display:flex;align-items:center;gap:.55rem;color:#3d6954;font-size:.88rem;font-weight:750;margin-top:1.1rem}.time-note>span:first-child{font-size:1.15rem}.time-dot{color:#d0a064}.feedback-form{padding:clamp(1.1rem,4vw,2.4rem)}.form-section{padding:0 0 1.7rem;margin-bottom:1.7rem;border-bottom:1px solid #e5ebe3}.form-section:last-of-type{border-bottom:0;margin-bottom:0;padding-bottom:.2rem}.section-heading{display:flex;align-items:flex-start;gap:.85rem;margin-bottom:1.2rem}.section-heading h2{margin:.1rem 0 .2rem}.section-heading p{margin:.1rem 0}.section-number{flex:0 0 42px;height:42px;display:grid;place-items:center;border-radius:14px;background:#e7f1e8;color:#235b46;font-size:.8rem;font-weight:850;letter-spacing:.04em}.rating-field{margin:1.45rem 0}.rating-field legend{font-size:1rem}.required-star{color:var(--coral)}.rating{max-width:390px}.rating label{font-size:1.05rem}.rating label span{pointer-events:none}.rating-ends{max-width:390px;display:flex;justify-content:space-between;color:#748177;font-size:.75rem;font-weight:650}.privacy-note{display:flex;align-items:center;gap:.5rem;color:#61756a;font-size:.84rem;margin:0}.privacy-note span{font-size:1.25rem;color:#347458}.submit-row{display:flex;justify-content:space-between;align-items:center;gap:1rem;padding-top:1.25rem}.submit-btn{min-width:205px}.visually-hidden{position:absolute!important;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap;border:0}
+@media(max-width:650px){.submit-row{align-items:stretch;flex-direction:column}.submit-btn{width:100%;order:-1}.privacy-note{justify-content:center}.section-heading{gap:.65rem}.section-number{flex-basis:36px;height:36px;border-radius:12px}.rating{max-width:none}.rating-ends{max-width:none}}
+</style>
+{% endblock %}

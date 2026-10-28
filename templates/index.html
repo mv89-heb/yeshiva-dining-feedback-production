@@ -1,1 +1,28 @@
-{% extends "base.html" %}{% block title %}{{ t.site_name }}{% endblock %}{% block content %}<section class="hero"><p class="muted">{{ t.home_tagline }}</p><h1>{{ t.home_title }}</h1><p>{{ t.home_intro }}</p><p><a class="btn" href="{{ url_for('feedback') }}">{{ t.give_feedback }}</a></p></section><div class="grid"><section class="card"><h2>{{ t.quick_simple }}</h2><p class="muted">{{ t.quick_simple_desc }}</p></section><section class="card"><h2>{{ t.help_improve }}</h2><p class="muted">{{ t.help_improve_desc }}</p></section></div>{% endblock %}
+{% extends "base.html" %}
+{% block title %}{{ t.site_name }}{% endblock %}
+{% block content %}
+<section class="hero home-hero">
+  <p class="eyebrow">{{ t.home_tagline }}</p>
+  <h1>{{ t.home_title }}</h1>
+  <p>{{ t.home_intro }}</p>
+  <p><a class="btn" href="{{ url_for('feedback') }}">{{ t.give_feedback }} <span aria-hidden="true">↗</span></a></p>
+</section>
+<div class="grid home-benefits">
+  <section class="card">
+    <div class="feature-icon" aria-hidden="true">✦</div>
+    <h2>{{ t.quick_simple }}</h2>
+    <p class="muted">{{ t.quick_simple_desc }}</p>
+    <span class="feature-note">01 · A minute of your time</span>
+  </section>
+  <section class="card">
+    <div class="feature-icon" aria-hidden="true">↗</div>
+    <h2>{{ t.help_improve }}</h2>
+    <p class="muted">{{ t.help_improve_desc }}</p>
+    <span class="feature-note">02 · A better meal for everyone</span>
+  </section>
+</div>
+<style>
+.home-hero{padding:clamp(2rem,7vw,5.8rem) 0 3rem;max-width:850px}.home-hero h1{font-size:clamp(3rem,8vw,5.8rem);max-width:12ch;line-height:.99}.home-hero>p:not(.eyebrow){max-width:58ch;font-size:clamp(1rem,2vw,1.18rem)}.home-hero .btn{min-width:190px}.home-benefits .card{min-height:215px;display:flex;flex-direction:column;align-items:flex-start}.feature-icon{width:48px;height:48px;border-radius:16px;display:grid;place-items:center;background:#e7f1e8;color:#1b5949;font-size:1.4rem;margin-bottom:1.25rem}.feature-note{margin-top:auto;padding-top:.8rem;color:#9a6a38;font-size:.75rem;font-weight:800;letter-spacing:.07em;text-transform:uppercase}
+[dir=rtl] .home-hero h1{max-width:15ch}
+</style>
+{% endblock %}
