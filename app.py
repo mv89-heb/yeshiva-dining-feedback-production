@@ -7,6 +7,7 @@ import secrets
 from datetime import datetime, timezone
 from zoneinfo import ZoneInfo
 from functools import wraps
+from urllib.parse import urlsplit
 
 import qrcode
 from flask import Flask, abort, flash, make_response, redirect, render_template, request, send_file, session, url_for
@@ -285,7 +286,15 @@ def set_language():
     if language in {"en", "he"}:
         session["language"] = language
     next_path = request.form.get("next", "/")
-    if not next_path.startswith("/") or next_path.startswith("//"):
+    # Accept only same-origin absolute paths; browsers may interpret backslashes as slashes.
+    parsed_next = urlsplit(next_path)
+    if (
+        not next_path.startswith("/")
+        or next_path.startswith("//")
+        or "\\" in next_path
+        or parsed_next.scheme
+        or parsed_next.netloc
+    ):
         next_path = "/"
     return redirect(next_path)
 
