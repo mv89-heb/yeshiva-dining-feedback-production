@@ -1,1 +1,16 @@
-{% extends "base.html" %}{% block title %}{{ t.thanks_title }}{% endblock %}{% block content %}<section class="card hero"><h1>{{ t.thanks_title }}</h1><p>{{ t.thanks_message }}</p><a class="btn" href="{{ url_for('feedback') }}">{{ t.rate_another }}</a></section>{% endblock %}
+{% extends "base.html" %}
+{% block title %}{{ t.thanks_title }}{% endblock %}
+{% block content %}
+<section class="thank-you card">
+  <div class="success-art" aria-hidden="true"><svg viewBox="0 0 80 80" fill="none"><circle cx="40" cy="40" r="36" fill="#E5F1E7"/><path d="m24 41 10 10 22-23" stroke="#1B5949" stroke-width="5" stroke-linecap="round" stroke-linejoin="round"/><path d="m14 17 3 5 5 2-5 3-3 5-2-5-5-3 5-2 2-5ZM64 49l2 4 4 2-4 2-2 4-2-4-4-2 4-2 2-4Z" fill="#D9A85C"/></svg></div>
+  <p class="eyebrow">{{ "YOUR VOICE MATTERS" if not is_hebrew else "הקול שלכם חשוב" }}</p>
+  <h1>{{ t.thanks_title }}</h1>
+  <p class="thank-copy">{{ t.thanks_message }}</p>
+  <div class="thank-divider"></div>
+  <p class="muted small">{{ "Small feedback. Real improvements." if not is_hebrew else "משוב קטן. שיפור אמיתי." }}</p>
+  <a class="btn" href="{{ url_for('index') }}">{{ "Back to home" if not is_hebrew else "חזרה לעמוד הראשי" }} <span aria-hidden="true">↗</span></a>
+</section>
+<style>
+.thank-you{text-align:center;max-width:690px;margin:2.2rem auto;padding:clamp(2rem,6vw,4rem)}.success-art{width:100px;height:100px;margin:0 auto 1.5rem}.success-art svg{width:100%;height:100%}.thank-you .eyebrow{justify-content:center}.thank-you h1{max-width:none;margin:.7rem 0;font-size:clamp(2.6rem,7vw,4rem)}.thank-copy{max-width:40ch;margin:0 auto;font-size:1.1rem;color:#52665a}.thank-divider{width:52px;height:3px;background:#d7a65c;border-radius:9px;margin:1.7rem auto}.thank-you .btn{margin-top:.8rem}
+</style>
+{% endblock %}
