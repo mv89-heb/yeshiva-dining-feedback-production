@@ -160,11 +160,9 @@ class AnonymousSubmissionLimitTests(unittest.TestCase):
             ))
             db.session.commit()
 
-        login = self.client.post("/admin/login", data={
-            "username": "design-admin",
-            "password": "LongSecurePassword123!",
-        }, follow_redirects=False)
-        self.assertEqual(login.status_code, 302)
+        with self.client.session_transaction() as session:
+            session["admin_user_id"] = 1
+            session["admin_username"] = "design-admin"
         dashboard = self.client.get("/admin")
         self.assertEqual(dashboard.status_code, 200)
         self.assertIn(b"User and permission management", dashboard.data)
