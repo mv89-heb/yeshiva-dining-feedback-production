@@ -124,5 +124,21 @@ class AnonymousSubmissionLimitTests(unittest.TestCase):
             self.assertEqual(AnonymousSubmission.query.count(), 1)
 
 
+    def test_language_switch_rejects_backslash_redirect(self):
+        response = self.client.post("/language", data={
+            "language": "he",
+            "next": "/\\\\evil.example",
+        }, follow_redirects=False)
+        self.assertEqual(response.status_code, 302)
+        self.assertEqual(response.headers["Location"], "/")
+
+    def test_language_switch_allows_safe_local_redirect(self):
+        response = self.client.post("/language", data={
+            "language": "he",
+            "next": "/feedback",
+        }, follow_redirects=False)
+        self.assertEqual(response.status_code, 302)
+        self.assertEqual(response.headers["Location"], "/feedback")
+
 if __name__ == "__main__":
     unittest.main()
