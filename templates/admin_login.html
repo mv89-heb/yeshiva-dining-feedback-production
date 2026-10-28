@@ -1,1 +1,20 @@
-{% extends "base.html" %}{% block title %}{{ t.admin_login }}{% endblock %}{% block content %}<section class="hero"><p class="muted">{{ t.management }}</p><h1>{{ t.admin_login }}</h1><p>{{ t.admin_login_intro }}</p></section><form class="card" method="post" action="{{ url_for('admin_login') }}"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><div class="field"><label for="username">{{ t.username }}</label><input id="username" name="username" autocomplete="username" required maxlength="100"></div><div class="field"><label for="password">{{ t.password }}</label><input id="password" name="password" type="password" autocomplete="current-password" required></div><button class="btn" type="submit">{{ t.sign_in }}</button></form>{% endblock %}
+{% extends "base.html" %}
+{% block title %}{{ t.admin_login }} · {{ t.site_name }}{% endblock %}
+{% block content %}
+<section class="hero login-hero">
+  <p class="eyebrow">{{ t.management }}</p>
+  <h1>{{ t.admin_login }}</h1>
+  <p>{{ t.admin_login_intro }}</p>
+</section>
+<form class="card login-form" method="post" action="{{ url_for('admin_login') }}">
+  <div class="login-symbol" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none"><rect x="4" y="10" width="16" height="11" rx="2.5" stroke="currentColor" stroke-width="1.7"/><path d="M8 10V7a4 4 0 0 1 8 0v3M12 14v3" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/></svg></div>
+  <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+  <div class="field"><label for="username">{{ t.username }}</label><input id="username" name="username" autocomplete="username" required maxlength="100"></div>
+  <div class="field"><label for="password">{{ t.password }}</label><input id="password" name="password" type="password" autocomplete="current-password" required></div>
+  <button class="btn login-submit" type="submit">{{ t.sign_in }} <span aria-hidden="true">↗</span></button>
+  <p class="login-secure muted small"><span aria-hidden="true">◇</span> {{ "Secure access for authorized managers only." if not is_hebrew else "גישה מאובטחת למנהלים מורשים בלבד." }}</p>
+</form>
+<style>
+.login-hero{max-width:600px;margin:1rem auto 0;text-align:center}.login-hero .eyebrow{justify-content:center}.login-hero h1{max-width:none}.login-form{max-width:480px;margin:0 auto 2rem}.login-symbol{width:52px;height:52px;border-radius:17px;background:#e6f1e8;color:#1b5949;display:grid;place-items:center;margin:0 auto 1.5rem}.login-symbol svg{width:27px;height:27px}.login-submit{width:100%;margin-top:.4rem}.login-secure{text-align:center;margin:1rem 0 0}
+</style>
+{% endblock %}
