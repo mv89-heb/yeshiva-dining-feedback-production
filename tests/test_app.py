@@ -7,7 +7,7 @@ import unittest
 from datetime import datetime
 from zoneinfo import ZoneInfo
 
-from app import app, db, Feedback, AnonymousSubmission, AdminUser
+from app import app, db, Feedback, AnonymousSubmission, AdminUser, limiter
 from werkzeug.security import generate_password_hash
 
 
@@ -37,6 +37,7 @@ class AnonymousSubmissionLimitTests(unittest.TestCase):
             os.environ["DATABASE_URL"] = cls.original_database_url
 
     def setUp(self):
+        limiter.reset()
         with app.app_context():
             db.session.remove()
             db.drop_all()
