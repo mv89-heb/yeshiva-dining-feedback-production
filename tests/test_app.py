@@ -142,11 +142,18 @@ class AnonymousSubmissionLimitTests(unittest.TestCase):
         self.assertEqual(response.headers["Location"], "/feedback")
 
     def test_public_templates_render(self):
-        for path in ("/", "/feedback/thanks", "/admin/login"):
+        for path in ("/", "/feedback", "/feedback/thanks", "/admin/login"):
             with self.subTest(path=path):
                 response = self.client.get(path)
                 self.assertEqual(response.status_code, 200)
                 self.assertIn(b"<!doctype html>", response.data.lower())
+                if path == "/feedback":
+                    self.assertIn(b"student-feedback-form", response.data)
+                    self.assertIn(b"emoji-rating", response.data)
+                    self.assertIn(b"dish_name", response.data)
+                    self.assertIn(b"meal_type", response.data)
+                if path == "/feedback/thanks":
+                    self.assertIn(b"FEEDBACK RECEIVED", response.data)
 
     def test_admin_dashboard_template_renders_after_login(self):
         with app.app_context():
