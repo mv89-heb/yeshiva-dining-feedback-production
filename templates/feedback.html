@@ -69,8 +69,9 @@
     const selected=mealRadios.some(r=>r.checked);
     if(!selected||!form.dataset.mealTouched){const radio=mealRadios.find(r=>r.value===chosen);if(radio)radio.checked=true;}
     mealRadios.forEach(r=>r.addEventListener('change',()=>form.dataset.mealTouched='1'));
-    const dateParts=new Intl.DateTimeFormat('en-CA',{timeZone:'Asia/Jerusalem',year:'numeric',month:'2-digit',day:'2-digit'}).format(new Date());
-    localDate.value=dateParts;
+    const dateParts=new Intl.DateTimeFormat('en-GB',{timeZone:'Asia/Jerusalem',year:'numeric',month:'2-digit',day:'2-digit'}).formatToParts(new Date());
+    const datePart=type=>dateParts.find(p=>p.type===type).value;
+    localDate.value=datePart('year')+'-'+datePart('month')+'-'+datePart('day');
   }
   selectMeal();
   const dishSection=document.querySelector('.dish-panel');
