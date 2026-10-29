@@ -336,8 +336,30 @@ def feedback():
             return value
 
         comments = request.form.get("comments", "").strip()
-        if len(comments) > 1200:
+        if len(comments) > 1000:
             raise ValueError("Comments are too long")
+
+        # Keep the current database schema stable while validating and persisting
+        # the optional structured feedback on the server (not only in browser JS).
+        portion_raw = request.form.get("portion_rating", "").strip()
+        portion_value = rating("portion_rating") if portion_raw else None
+        dish_name = request.form.get("dish_name", "").strip()
+        dish_rating_raw = request.form.get("dish_rating", "").strip()
+        dish_value = rating("dish_rating") if dish_rating_raw else None
+        if len(dish_name) > 100:
+            raise ValueError("Dish name is too long")
+        if bool(dish_name) != (dish_value is not None):
+            raise ValueError("Dish name and rating must be provided together")
+
+        metadata = []
+        if portion_value is not None:
+            metadata.append(translate("Portion size", "כמות המנות") + f": {portion_value}/5")
+        if dish_name and dish_value is not None:
+            metadata.append(translate("Dish feedback", "דירוג מנה") + f": {dish_name} — {dish_value}/5")
+        if metadata:
+            comments = (comments + ("\\n\\n" if comments else "") + "\\n".join(metadata)).strip()
+        if len(comments) > 1200:
+            raise ValueError("Combined feedback is too long")
 
         respondent_hash = respondent_digest(respondent_token)
         duplicate = AnonymousSubmission.query.filter_by(
