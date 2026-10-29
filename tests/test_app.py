@@ -7,7 +7,7 @@ import unittest
 from datetime import datetime
 from zoneinfo import ZoneInfo
 
-from app import app, db, Feedback, AnonymousSubmission, AdminUser
+from app import app, db, Feedback, AnonymousSubmission, AdminUser, limiter
 from werkzeug.security import generate_password_hash
 
 
@@ -37,6 +37,7 @@ class AnonymousSubmissionLimitTests(unittest.TestCase):
             os.environ["DATABASE_URL"] = cls.original_database_url
 
     def setUp(self):
+        limiter.reset()
         with app.app_context():
             db.session.remove()
             db.drop_all()
@@ -53,6 +54,7 @@ class AnonymousSubmissionLimitTests(unittest.TestCase):
             "taste_rating": "4",
             "variety_rating": "3",
             "cleanliness_rating": "5",
+            "portion_rating": "4",
             "comments": "",
         }, follow_redirects=False)
 
@@ -124,6 +126,59 @@ class AnonymousSubmissionLimitTests(unittest.TestCase):
             self.assertEqual(Feedback.query.count(), 1)
             self.assertEqual(AnonymousSubmission.query.count(), 1)
 
+
+    def test_portion_and_dish_ratings_are_persisted_without_javascript(self):
+        response = self.client.post("/feedback", data={
+            "meal_date": self.today,
+            "meal_type": "lunch",
+            "food_rating": "4",
+            "taste_rating": "5",
+            "variety_rating": "3",
+            "cleanliness_rating": "5",
+            "portion_rating": "2",
+            "dish_name": "Schnitzel",
+            "dish_rating": "5",
+            "comments": "Very tasty",
+        })
+        self.assertEqual(response.status_code, 302)
+        with app.app_context():
+            saved = Feedback.query.one()
+            self.assertIn("Very tasty", saved.comments)
+            self.assertIn("Portion size: 2/5", saved.comments)
+            self.assertIn("Dish feedback: Schnitzel — 5/5", saved.comments)
+
+    def test_incomplete_dish_feedback_is_rejected_without_saving(self):
+        response = self.client.post("/feedback", data={
+            "meal_date": self.today,
+            "meal_type": "lunch",
+            "food_rating": "4",
+            "taste_rating": "4",
+            "variety_rating": "3",
+            "cleanliness_rating": "5",
+            "portion_rating": "4",
+            "dish_name": "Schnitzel",
+            "comments": "",
+        })
+        self.assertEqual(response.status_code, 400)
+        with app.app_context():
+            self.assertEqual(Feedback.query.count(), 0)
+            self.assertEqual(AnonymousSubmission.query.count(), 0)
+
+    def test_invalid_portion_rating_is_rejected_without_saving(self):
+        response = self.client.post("/feedback", data={
+            "meal_date": self.today,
+            "meal_type": "lunch",
+            "food_rating": "4",
+            "taste_rating": "4",
+            "variety_rating": "3",
+            "cleanliness_rating": "5",
+            "portion_rating": "9",
+            "comments": "",
+        })
+        self.assertEqual(response.status_code, 400)
+        with app.app_context():
+            self.assertEqual(Feedback.query.count(), 0)
+            self.assertEqual(AnonymousSubmission.query.count(), 0)
 
     def test_language_switch_rejects_backslash_redirect(self):
         response = self.client.post("/language", data={

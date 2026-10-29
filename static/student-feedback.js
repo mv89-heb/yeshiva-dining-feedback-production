@@ -5,8 +5,6 @@
   const localDate=document.getElementById('meal_date');
   const dishName=document.getElementById('dish_name');
   const dishRating=Array.from(form.querySelectorAll('input[name="dish_rating"]'));
-  const portionRating=Array.from(form.querySelectorAll('input[name="portion_rating"]'));
-  const comments=document.getElementById('comments');
   const submit=document.getElementById('submit-feedback');
   function selectMeal(){
     const parts=new Intl.DateTimeFormat('en-GB',{timeZone:'Asia/Jerusalem',hour:'2-digit',minute:'2-digit',hourCycle:'h23'}).formatToParts(new Date());
@@ -32,16 +30,7 @@
       return;
     }
     dishName.setCustomValidity('');
-    const metadata=[];
-    const portion=portionRating.find(r=>r.checked);
-    if(portion)metadata.push((document.documentElement.lang==='he'?'כמות המנות':'Portion size')+': '+portion.value+'/5');
-    if(name&&rating)metadata.push((document.documentElement.lang==='he'?'דירוג מנה':'Dish feedback')+': '+name+' — '+rating.value+'/5');
-    if(metadata.length){
-      const existing=comments.value.trim();
-      const suffix=metadata.join('\n');
-      const prefix=existing?existing.slice(0,Math.max(0,1200-suffix.length-2))+'\n\n':'';
-      comments.value=(prefix+suffix).slice(0,1200);
-    }
+    // The server validates and persists optional ratings in the existing comments field.
     submit.disabled=true;
     submit.querySelector('span').textContent=document.documentElement.lang==='he'?'שולח…':'Sending…';
     submit.setAttribute('aria-busy','true');
