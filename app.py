@@ -357,7 +357,7 @@ def feedback():
         if dish_name and dish_value is not None:
             metadata.append(translate("Dish feedback", "דירוג מנה") + f": {dish_name} — {dish_value}/5")
         if metadata:
-            comments = (comments + ("\\n\\n" if comments else "") + "\\n".join(metadata)).strip()
+            comments = (comments + ("\n\n" if comments else "") + "\n".join(metadata)).strip()
         if len(comments) > 1200:
             raise ValueError("Combined feedback is too long")
 
