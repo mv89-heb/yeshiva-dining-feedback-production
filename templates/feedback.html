@@ -43,14 +43,14 @@
   <section class="dish-panel">
     <div class="dish-heading"><span class="dish-icon" aria-hidden="true">🍗</span><div><span class="panel-kicker">{{ "02 / ONE SPECIFIC DISH" if not is_hebrew else "02 / מנה ספציפית" }}</span><h2>{{ "Was there a dish worth mentioning?" if not is_hebrew else "רוצים לדרג מנה מסוימת?" }}</h2><p>{{ "Optional — tell the kitchen what you thought of a dish served today." if not is_hebrew else "לא חובה — ספרו למטבח מה חשבתם על מנה שהוגשה היום." }}</p></div></div>
     <div class="dish-fields">
-      <div class="dish-name-field"><label for="dish_name">{{ "Dish name" if not is_hebrew else "שם המנה" }}</label><input id="dish_name" type="text" maxlength="100" placeholder="{{ 'e.g. Schnitzel, fish, rice…' if not is_hebrew else 'למשל: שניצל, דג, אורז…' }}"></div>
+      <div class="dish-name-field"><label for="dish_name">{{ "Dish name" if not is_hebrew else "שם המנה" }}</label><input id="dish_name" name="dish_name" type="text" maxlength="100" placeholder="{{ 'e.g. Schnitzel, fish, rice…' if not is_hebrew else 'למשל: שניצל, דג, אורז…' }}"></div>
       <fieldset class="dish-rating-field"><legend>{{ "How was it?" if not is_hebrew else "איך הייתה המנה?" }}</legend><div class="dish-stars" role="radiogroup" aria-label="{{ 'Dish rating' if not is_hebrew else 'דירוג המנה' }}">{% for n in range(1,6) %}<label><input type="radio" name="dish_rating" value="{{ n }}"><span aria-hidden="true">★</span><small>{{ n }}</small></label>{% endfor %}</div></fieldset>
     </div>
     <p class="dish-hint">{{ "Add the dish name and a rating to send specific feedback." if not is_hebrew else "כדי לשלוח דירוג למנה, מלאו גם את השם וגם את הציון." }}</p>
   </section>
   <section class="comments-panel">
     <label for="comments" class="comments-label"><span aria-hidden="true">💬</span><span><strong>{{ "Anything for the kitchen?" if not is_hebrew else "יש משהו לומר למטבח?" }}</strong><small>{{ "Optional · short and specific is best" if not is_hebrew else "לא חובה · קצר וממוקד זה מצוין" }}</small></span></label>
-    <textarea id="comments" name="comments" maxlength="1200" placeholder="{{ 'Any specific note for the kitchen? Write a short comment (optional).' if not is_hebrew else 'יש לך הערה ספציפית למטבח? כתוב בקצרה (לא חובה).' }}"></textarea>
+    <textarea id="comments" name="comments" maxlength="1000" placeholder="{{ 'Any specific note for the kitchen? Write a short comment (optional).' if not is_hebrew else 'יש לך הערה ספציפית למטבח? כתוב בקצרה (לא חובה).' }}"></textarea>
   </section>
   <div class="submit-sticky"><div class="privacy-note"><span aria-hidden="true">🔒</span><span>{{ "Anonymous · one response per meal on this browser" if not is_hebrew else "אנונימי · משוב אחד לכל ארוחה בדפדפן הזה" }}</span></div><button class="btn submit-btn" id="submit-feedback" type="submit"><span>{{ "Send my feedback" if not is_hebrew else "שליחת המשוב" }}</span><span aria-hidden="true">↗</span></button></div>
 </form>
