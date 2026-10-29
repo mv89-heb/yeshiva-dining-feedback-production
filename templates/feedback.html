@@ -89,7 +89,9 @@
     if(name&&rating){
       const label=document.documentElement.lang==='he'?'דירוג מנה':'Dish feedback';
       const line=label+': '+name+' — '+rating.value+'/5';
-      comments.value=comments.value.trim()?comments.value.trim()+'\n\n'+line:line;
+      const existing=comments.value.trim();
+      comments.value=(existing?existing.slice(0,Math.max(0,1190-line.length))+'\n\n':'')+line;
+      comments.value=comments.value.slice(0,1200);
     }
     submit.disabled=true;
     submit.querySelector('span').textContent=document.documentElement.lang==='he'?'שולח…':'Sending…';
