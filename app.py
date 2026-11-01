@@ -170,6 +170,24 @@ def secure_headers(response):
     return response
 
 
+@app.get("/live")
+def liveness_check():
+    """Lightweight process liveness probe; deliberately independent of PostgreSQL."""
+    return {"status": "alive"}, 200
+
+
+@app.get("/ready")
+def readiness_check():
+    """Verify the database dependency required to serve feedback and admin pages."""
+    try:
+        db.session.execute(text("SELECT 1"))
+        return {"status": "ready", "database": "ok"}, 200
+    except Exception:
+        db.session.rollback()
+        app.logger.exception("Readiness probe failed: database unavailable.")
+        return {"status": "not_ready", "database": "unavailable"}, 503
+
+
 def translate(en, he):
     return he if session.get("language", "en") == "he" else en
 
