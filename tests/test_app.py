@@ -4,6 +4,7 @@ Run with: python -m unittest discover -s tests -v
 """
 import os
 import unittest
+from unittest.mock import patch
 from datetime import datetime
 from zoneinfo import ZoneInfo
 
@@ -57,6 +58,15 @@ class AnonymousSubmissionLimitTests(unittest.TestCase):
             "portion_rating": "4",
             "comments": "",
         }, follow_redirects=False)
+
+    def test_liveness_and_readiness_endpoints(self):
+        live = self.client.get("/live")
+        self.assertEqual(live.status_code, 200)
+        self.assertEqual(live.get_json(), {"status": "alive"})
+
+        ready = self.client.get("/ready")
+        self.assertEqual(ready.status_code, 200)
+        self.assertEqual(ready.get_json(), {"status": "ready", "database": "ok"})
 
     def test_same_browser_cannot_submit_same_meal_twice(self):
         first = self.submit(self.client, "lunch")
