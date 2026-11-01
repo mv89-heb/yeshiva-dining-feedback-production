@@ -4,7 +4,6 @@ Run with: python -m unittest discover -s tests -v
 """
 import os
 import unittest
-from unittest.mock import patch
 from datetime import datetime
 from zoneinfo import ZoneInfo
 
