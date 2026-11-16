@@ -960,15 +960,27 @@ def update_admin_user(user_id):
     return redirect(url_for("admin_dashboard"))
 
 
+def public_feedback_url():
+    return (APP_BASE_URL or request.url_root.rstrip("/")) + url_for("feedback")
+
+
 @app.get("/admin/qr.png")
 @permission_required("can_view_feedback")
 def admin_qr_code():
-    public_url = (APP_BASE_URL or request.url_root.rstrip("/")) + url_for("feedback")
-    qr_image = qrcode.make(public_url)
+    qr_image = qrcode.make(public_feedback_url())
     image_buffer = io.BytesIO()
     qr_image.save(image_buffer, format="PNG")
     image_buffer.seek(0)
     return send_file(image_buffer, mimetype="image/png", download_name="yeshiva-dining-feedback-qr.png", max_age=0)
+
+
+@app.get("/admin/qr-flyer")
+@permission_required("can_view_feedback")
+def admin_qr_flyer():
+    return render_template(
+        "admin_qr_flyer.html",
+        feedback_url=public_feedback_url(),
+    )
 
 
 @app.errorhandler(413)
