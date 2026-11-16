@@ -58,7 +58,7 @@ jobs:
           assert b'"status": "ready"' in ready[3] or b'"status":"ready"' in ready[3], "database readiness check did not pass"
           assert b'name="csrf_token"' in feedback[3], "feedback form or CSRF token missing"
           assert any(cookie.name == "dining_respondent" for cookie in jar), "anonymous browser token cookie was not set"
-          assert b"Tell us about your meal" in feedback[3], "English should be the default language"
+          assert b"How was your meal?" in feedback[3], "English should be the default language"\nassert b'name="dish_name"' in feedback[3] and b"required" in feedback[3], "required dish selector missing"\nassert "Thai-style meat with noodles".encode("utf-8") in feedback[3], "English menu entry missing"
 
           csrf_match = re.search(rb'name="csrf_token" value="([^"]+)"', feedback[3])
           assert csrf_match, "language switch CSRF token missing"
@@ -79,13 +79,13 @@ jobs:
 
           hebrew_feedback = switch_language("he")
           assert b'<html lang="he" dir="rtl">' in hebrew_feedback, "Hebrew mode did not set RTL direction"
-          assert "ספרו לנו על הארוחה".encode("utf-8") in hebrew_feedback, "Hebrew translation missing"
+          assert "איך הייתה הארוחה?".encode("utf-8") in hebrew_feedback, "Hebrew translation missing"\nassert "שניצלים".encode("utf-8") in hebrew_feedback, "Hebrew menu entry missing"
           hebrew_csrf = re.search(rb'name="csrf_token" value="([^"]+)"', hebrew_feedback)
           assert hebrew_csrf, "Hebrew form CSRF token missing"
           csrf_match = hebrew_csrf
           english_feedback = switch_language("en")
           assert b'<html lang="en" dir="ltr">' in english_feedback, "English mode did not restore LTR direction"
-          assert b"Tell us about your meal" in english_feedback, "English translation missing"
+          assert b"How was your meal?" in english_feedback, "English translation missing"\nassert b"Thai-style meat with noodles" in english_feedback, "English menu translation missing"
 
           login = get("/admin/login")
           assert login[0] == 200, f"admin login is not configured correctly: HTTP {login[0]}"
