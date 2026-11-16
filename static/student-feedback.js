@@ -9,7 +9,7 @@
   const dishPanel=document.getElementById('dish-panel');
   const submit=document.getElementById('submit-feedback');
   const catalog=JSON.parse(document.getElementById('menu-catalog').textContent||'[]');
-  const words={en:{loading:"Loading the menu…",empty:"No menu is configured for this meal yet. Please contact the dining team.",main:"Main dishes",side:"Side dishes",ate:"I ate this",rate:"Rate this dish",notAte:"Leave unchecked if you did not eat it."},he:{loading:"טוען את התפריט…",empty:"עדיין לא הוגדר תפריט לארוחה זו. פנו לצוות חדר האוכל.",main:"מנות עיקריות",side:"תוספות",ate:"אכלתי את המנה",rate:"דרגו את המנה",notAte:"אם לא אכלתם, השאירו ללא סימון."}};
+  const words={en:{loading:"Loading the menu…",empty:"No dishes are scheduled for this meal. Please contact the dining team.",fallback:"The full catalog is shown until today's menu is configured.",main:"Main dishes",side:"Side dishes",ate:"I ate this",rate:"Rate this dish",notAte:"Leave unchecked if you did not eat it."},he:{loading:"טוען את התפריט…",empty:"לא הוגדרו מנות לארוחה זו. פנו לצוות חדר האוכל.",fallback:"מוצג המאגר המלא עד להגדרת התפריט היומי.",main:"מנות עיקריות",side:"תוספות",ate:"אכלתי את המנה",rate:"דרגו את המנה",notAte:"אם לא אכלתם, השאירו ללא סימון."}};
   const lang=document.documentElement.lang==='he'?'he':'en';
   function setLocalDate(){
     const parts=new Intl.DateTimeFormat('en-GB',{timeZone:'Asia/Jerusalem',year:'numeric',month:'2-digit',day:'2-digit'}).formatToParts(new Date());
@@ -53,7 +53,7 @@
       let items=payload.dishes||[];
       if(!payload.configured){
         items=catalog.map(d=>({slug:d[0],he:d[1],en:d[2],category:'main'}));
-        status.textContent=words[lang].empty;
+        status.textContent=words[lang].fallback;
       }else status.textContent='';
       items.forEach(item=>(item.category==='side'?sideRoot:mainRoot).append(renderDish(item)));
       if(!items.length)status.textContent=words[lang].empty;
