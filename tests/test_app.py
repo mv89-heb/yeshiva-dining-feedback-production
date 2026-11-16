@@ -298,6 +298,39 @@ class AnonymousSubmissionLimitTests(unittest.TestCase):
             self.assertEqual(Feedback.query.count(), 0)
             self.assertEqual(AnonymousSubmission.query.count(), 0)
 
+
+    def test_explicit_empty_daily_override_does_not_fall_back_to_weekly(self):
+        from app import MENU_DISHES
+        today = datetime.now(ZoneInfo("Asia/Jerusalem")).date()
+        with app.app_context():
+            db.session.add(WeeklyMenuDish(weekday=today.weekday(), meal_type="lunch",
+                                          dish_slug=MENU_DISHES[0][0], category="main"))
+            db.session.add(DailyMenuOverride(meal_date=today, meal_type="lunch"))
+            db.session.commit()
+        response = self.client.get("/api/menu?date=" + self.today + "&meal_type=lunch")
+        self.assertEqual(response.status_code, 200)
+        payload = response.get_json()
+        self.assertTrue(payload["configured"])
+        self.assertEqual(payload["dishes"], [])
+
+    def test_portion_rating_is_required_by_server(self):
+        from app import MENU_DISHES
+        response = self.client.post("/feedback", data={
+            "meal_date": self.today, "meal_type": "lunch",
+            "food_rating": "4", "taste_rating": "4", "variety_rating": "4",
+            "cleanliness_rating": "4",
+            "dish_slug": MENU_DISHES[0][0],
+            "dish_rating_" + MENU_DISHES[0][0]: "4",
+        })
+        self.assertEqual(response.status_code, 400)
+        with app.app_context():
+            self.assertEqual(Feedback.query.count(), 0)
+            self.assertEqual(AnonymousSubmission.query.count(), 0)
+
+    def test_admin_menu_data_requires_manager_permission(self):
+        response = self.client.get("/api/admin/menu?scope=weekly&weekday=0&meal_type=lunch")
+        self.assertEqual(response.status_code, 302)
+
     def test_language_switch_rejects_backslash_redirect(self):
         response = self.client.post("/language", data={
             "language": "he",
