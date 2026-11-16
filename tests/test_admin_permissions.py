@@ -105,7 +105,7 @@ class AdminPermissionTests(unittest.TestCase):
         self.assertEqual(dashboard.status_code, 200)
         for rule in (
             b".nav{display:flex;flex-direction:column;align-items:stretch",
-            b"main{width:calc(100% - 1rem)",
+            b"main{display:block;width:auto",
             b".admin-page .admin-hero{display:flex;flex-direction:column",
             b".admin-page .qr-card{display:grid;grid-template-columns:minmax(0,1fr)",
             b".admin-page .admin-filters{display:grid;grid-template-columns:minmax(0,1fr)",
