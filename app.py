@@ -622,7 +622,7 @@ def feedback():
             served = {slug: "main" for slug in selected_slugs}
         dish_ratings = [(slug, served.get(slug, "main"), rating("dish_rating") if legacy_mode else rating("dish_rating_" + slug)) for slug in selected_slugs]
         if legacy_mode:
-            comments = (comments + ("\\n\\n" if comments else "") + f"Portion size: {portion_value}/5\\nDish feedback: {next(d[1] for d in MENU_DISHES if d[0] == selected_slugs[0])} — {dish_ratings[0][2]}/5").strip()
+            comments = (comments + ("\n\n" if comments else "") + f"Portion size: {portion_value}/5\nDish feedback: {next(d[1] for d in MENU_DISHES if d[0] == selected_slugs[0])} — {dish_ratings[0][2]}/5").strip()
         if len(comments) > 1200:
             raise ValueError("Comments are too long")
 
@@ -855,7 +855,7 @@ def dashboard_response():
     recent = Feedback.query.order_by(Feedback.created_at.desc()).limit(100).all() if can_view else []
     dish_stats = db.session.query(DishRating.dish_slug, DishRating.category, func.avg(DishRating.rating), func.count(DishRating.id)).group_by(DishRating.dish_slug, DishRating.category).order_by(func.avg(DishRating.rating).desc()).all() if can_view else []
     dish_labels = {dish[0]: (dish[1], dish[2]) for dish in MENU_DISHES}
-    dish_results = [{"name": (dish_labels.get(slug, ("", slug))[1] if not session.get("language", "en") == "he" else dish_labels.get(slug, ("", slug))[0]), "category": category, "average": average, "count": count} for slug, category, average, count in dish_stats]
+    dish_results = [{"name": (dish_labels.get(slug, ("", slug))[1] if session.get("language", "en") != "he" else dish_labels.get(slug, ("", slug))[0]), "category": category, "average": average, "count": count} for slug, category, average, count in dish_stats]
     users = AdminUser.query.order_by(AdminUser.role.desc(), AdminUser.username.asc()).all() if can_manage else []
     return render_template("admin.html", total=total, averages=averages, recent=recent, users=users, can_view_feedback=can_view, can_manage_users=can_manage, dish_results=dish_results)
 
