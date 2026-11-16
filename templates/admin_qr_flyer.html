@@ -1,0 +1,78 @@
+{% extends "base.html" %}
+{% block title %}Student Feedback Flyer — Yeshiva Dining{% endblock %}
+{% block head_extra %}
+<style>
+.flyer-actions{display:flex;justify-content:space-between;align-items:center;gap:1rem;margin:0 auto 1rem;max-width:780px}
+.flyer-actions a{font-weight:750;text-decoration:none}
+.flyer-actions .btn{width:auto}
+.flyer{position:relative;isolation:isolate;overflow:hidden;max-width:780px;min-height:920px;margin:0 auto;padding:clamp(1.5rem,5vw,3.4rem);border:1px solid #dce8dc;border-radius:30px;background:linear-gradient(155deg,#fffefa 0%,#f1f6ee 100%);box-shadow:0 22px 60px rgba(18,59,50,.13);text-align:center}
+.flyer:before,.flyer:after{position:absolute;z-index:-1;content:"";border-radius:50%;pointer-events:none}
+.flyer:before{width:390px;height:390px;top:-220px;right:-120px;background:rgba(233,185,104,.23)}
+.flyer:after{width:430px;height:430px;bottom:-270px;left:-170px;background:rgba(27,89,73,.10)}
+.flyer-brand{display:inline-flex;align-items:center;gap:.65rem;padding:.55rem 1rem;border:1px solid #dce8dc;border-radius:999px;background:rgba(255,255,255,.82);color:#1b5949;font-size:.8rem;font-weight:850;letter-spacing:.12em}
+.flyer-brand-mark{display:grid;place-items:center;width:32px;height:32px;border-radius:11px;background:linear-gradient(145deg,#f1cc8c,#dfa85d);color:#123b32;font-size:1.15rem}
+.flyer-kicker{margin:2rem 0 .55rem;color:#a16b3e;font-size:.78rem;font-weight:900;letter-spacing:.2em}
+.flyer h1{margin:0 auto;max-width:15ch;color:#123b32;font-size:clamp(2.3rem,6vw,4.15rem);line-height:1.02;letter-spacing:-.055em}
+.flyer-he-title{margin:.75rem 0 .55rem;color:#1b5949;font-size:clamp(1.7rem,4.4vw,2.7rem);font-weight:900;line-height:1.15}
+.flyer-intro{max-width:560px;margin:.7rem auto 1.6rem;color:#52665a;font-size:1.05rem;line-height:1.75}
+.flyer-intro-he{margin:.25rem auto 1.65rem;font-size:1.08rem}
+.flyer-qr-wrap{position:relative;width:min(100%,350px);margin:0 auto;padding:17px;border:2px solid #d7e6d9;border-radius:28px;background:#fff;box-shadow:0 14px 35px rgba(18,59,50,.12)}
+.flyer-qr-wrap:before{position:absolute;inset:7px;border:1px dashed #e3eadf;border-radius:19px;content:"";pointer-events:none}
+.flyer-qr{position:relative;display:block;width:100%;height:auto;image-rendering:pixelated}
+.flyer-cta{margin:1.4rem 0 .3rem;color:#123b32;font-size:1.22rem;font-weight:950;letter-spacing:.035em}
+.flyer-cta-he{margin:.2rem 0 1.15rem;color:#123b32;font-size:1.45rem;font-weight:950}
+.flyer-steps{display:grid;grid-template-columns:repeat(3,1fr);gap:.75rem;max-width:630px;margin:1.5rem auto}
+.flyer-step{padding:.85rem .6rem;border:1px solid #e0e9df;border-radius:15px;background:rgba(255,255,255,.78)}
+.flyer-step b{display:block;margin-bottom:.2rem;color:#1b5949;font-size:.9rem}
+.flyer-step span{display:block;color:#65756a;font-size:.78rem;line-height:1.45}
+.flyer-privacy{max-width:570px;margin:1.1rem auto .3rem;padding:.8rem 1rem;border-radius:14px;background:#e7f0e8;color:#345b43;font-size:.88rem;font-weight:700}
+.flyer-url{margin:.8rem auto 0;color:#718076;font-size:.7rem;overflow-wrap:anywhere}
+@media(max-width:560px){.flyer{min-height:0;padding:1.3rem 1rem 1.7rem;border-radius:21px}.flyer-steps{grid-template-columns:1fr;gap:.45rem}.flyer-step{display:flex;align-items:center;justify-content:center;gap:.4rem;padding:.6rem}.flyer-step b,.flyer-step span{display:inline;margin:0}.flyer-intro{font-size:.95rem}.flyer-qr-wrap{width:min(100%,300px)}.flyer-actions{align-items:stretch;flex-direction:column}.flyer-actions .btn{width:100%}}
+@page{size:A4 portrait;margin:9mm}
+@media print{
+ html,body{background:#fff!important}
+ body{print-color-adjust:exact;-webkit-print-color-adjust:exact}
+ header,footer,main>.notice,.flyer-actions{display:none!important}
+ main{width:100%;min-height:0;margin:0;padding:0}
+ .flyer{width:100%;max-width:none;min-height:0;margin:0;padding:13mm 10mm;border:0;border-radius:0;box-shadow:none;break-inside:avoid}
+ .flyer-kicker{margin-top:11mm}
+ .flyer h1{font-size:37pt}
+ .flyer-he-title{font-size:25pt}
+ .flyer-intro{font-size:11pt;margin-bottom:7mm}
+ .flyer-intro-he{margin-bottom:7mm}
+ .flyer-qr-wrap{width:78mm;padding:3mm;border-radius:5mm}
+ .flyer-cta{font-size:14pt;margin-top:6mm}
+ .flyer-cta-he{font-size:17pt;margin-bottom:6mm}
+ .flyer-steps{margin:7mm auto;gap:3mm}
+ .flyer-step{padding:3mm 2mm}
+ .flyer-privacy{margin-top:5mm;padding:3mm 5mm}
+}
+</style>
+{% endblock %}
+{% block content %}
+<div class="flyer-actions">
+  <a href="{{ url_for('admin_dashboard') }}">← {{ "חזרה ללוח הניהול" if is_hebrew else "Back to dashboard" }}</a>
+  <button class="btn" type="button" id="print-flyer">{{ "הדפסה / שמירה כ־PDF" if is_hebrew else "Print / Save as PDF" }}</button>
+</div>
+<article class="flyer" aria-label="Bilingual student dining feedback flyer">
+  <div class="flyer-brand"><span class="flyer-brand-mark" aria-hidden="true">✦</span><span>YESHIVA DINING · חדר האוכל בישיבה</span></div>
+  <p class="flyer-kicker">YOUR VOICE MAKES A DIFFERENCE</p>
+  <h1>How was your meal?</h1>
+  <p class="flyer-he-title" dir="rtl">איך הייתה הארוחה שלכם?</p>
+  <p class="flyer-intro">Help us make every meal better. Scan the code and share your honest feedback — it takes about one minute.</p>
+  <p class="flyer-intro flyer-intro-he" dir="rtl">עזרו לנו לשפר כל ארוחה. סרקו את הקוד ושתפו אותנו בחוות דעתכם — זה לוקח בערך דקה.</p>
+  <div class="flyer-qr-wrap">
+    <img class="flyer-qr" src="{{ url_for('admin_qr_code') }}" alt="QR code to open the student feedback form">
+  </div>
+  <p class="flyer-cta">SCAN. SHARE. MAKE IT BETTER.</p>
+  <p class="flyer-cta-he" dir="rtl">סורקים. משתפים. משפרים ביחד.</p>
+  <div class="flyer-steps">
+    <div class="flyer-step"><b>01 · Scan</b><span>Open your phone camera</span></div>
+    <div class="flyer-step"><b>02 · Rate</b><span>Choose your meal and rate</span></div>
+    <div class="flyer-step"><b>03 · Improve</b><span>Help us do better next time</span></div>
+  </div>
+  <div class="flyer-privacy" dir="auto">No name or student ID needed · אין צורך בשם או במספר תלמיד</div>
+  <p class="flyer-url">{{ feedback_url }}</p>
+</article>
+{% endblock %}
+{% block scripts %}<script src="{{ url_for('static', filename='qr-flyer.js') }}" defer></script>{% endblock %}
