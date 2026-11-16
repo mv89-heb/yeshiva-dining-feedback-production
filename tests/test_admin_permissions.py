@@ -56,16 +56,15 @@ class AdminPermissionTests(unittest.TestCase):
                                 follow_redirects=False)
 
 
-    def test_admin_menu_editor_loads_external_script_after_document(self):
+    def test_legacy_menu_management_url_redirects_to_dashboard(self):
         self.login("admin", "StrongTestPassword1!")
-        response = self.client.get("/admin/menu")
-        self.assertEqual(response.status_code, 200)
-        html = response.data.decode("utf-8")
-        title = html.split("<title>", 1)[1].split("</title>", 1)[0]
-        self.assertNotIn("<script", title)
-        self.assertIn("/static/admin-menu.js", html)
-        self.assertIn('id="weekly-menu-status"', html)
-        self.assertIn('id="daily-menu-status"', html)
+        response = self.client.get("/admin/menu", follow_redirects=False)
+        self.assertEqual(response.status_code, 302)
+        self.assertEqual(response.headers["Location"], "/admin")
+        dashboard = self.client.get("/admin")
+        self.assertEqual(dashboard.status_code, 200)
+        self.assertNotIn(b"Manage menus", dashboard.data)
+        self.assertNotIn("ניהול תפריטים".encode("utf-8"), dashboard.data)
 
     def test_dashboard_filters_feedback_by_date_and_meal(self):
         today = datetime.now(ZoneInfo("Asia/Jerusalem")).date()
