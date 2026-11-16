@@ -295,6 +295,12 @@ class DishRating(db.Model):
     rating = db.Column(db.Integer, nullable=False)
     __table_args__ = (UniqueConstraint("feedback_id", "dish_slug", name="uq_feedback_dish_rating"),)
 
+class PortionRating(db.Model):
+    __tablename__ = "portion_ratings"
+    id = db.Column(db.Integer, primary_key=True)
+    feedback_id = db.Column(db.Integer, db.ForeignKey("feedback.id", ondelete="CASCADE"), nullable=False, unique=True, index=True)
+    rating = db.Column(db.Integer, nullable=False)
+
 
 class AnonymousSubmission(db.Model):
     __tablename__ = "anonymous_submissions"
@@ -591,10 +597,12 @@ def feedback():
 
         portion_value = rating("portion_rating")
         selected_slugs = request.form.getlist("dish_slug")
+        legacy_mode = False
         if not selected_slugs:
             legacy_name = request.form.get("dish_name", "").strip()
             legacy = next((d for d in MENU_DISHES if legacy_name in {d[1], d[2]}), None)
             if legacy:
+                legacy_mode = True
                 selected_slugs = [legacy[0]]
         if not selected_slugs or len(selected_slugs) != len(set(selected_slugs)):
             raise ValueError("Select at least one dish, without duplicates")
@@ -610,8 +618,10 @@ def feedback():
             raise ValueError("A selected dish was not served at this meal")
         if not served:
             served = {slug: "main" for slug in selected_slugs}
-        dish_ratings = [(slug, served.get(slug, "main"), rating("dish_rating_" + slug)) for slug in selected_slugs]
-        if len(comments) > 1000:
+        dish_ratings = [(slug, served.get(slug, "main"), rating("dish_rating") if legacy_mode else rating("dish_rating_" + slug)) for slug in selected_slugs]
+        if legacy_mode:
+            comments = (comments + ("\\n\\n" if comments else "") + f"Portion size: {portion_value}/5\\nDish feedback: {next(d[1] for d in MENU_DISHES if d[0] == selected_slugs[0])} — {dish_ratings[0][2]}/5").strip()
+        if len(comments) > 1200:
             raise ValueError("Comments are too long")
 
         respondent_hash = respondent_digest(respondent_token)
@@ -640,6 +650,7 @@ def feedback():
         )
         db.session.add(feedback_record)
         db.session.flush()
+        db.session.add(PortionRating(feedback_id=feedback_record.id, rating=portion_value))
         for slug, category, value in dish_ratings:
             db.session.add(DishRating(feedback_id=feedback_record.id, dish_slug=slug, category=category, rating=value))
         db.session.commit()
@@ -792,6 +803,7 @@ def dashboard_response():
         translate("Taste", "טעם"): db.session.query(func.avg(Feedback.taste_rating)).scalar(),
         translate("Variety", "מגוון"): db.session.query(func.avg(Feedback.variety_rating)).scalar(),
         translate("Cleanliness", "ניקיון"): db.session.query(func.avg(Feedback.cleanliness_rating)).scalar(),
+        translate("Portion size", "כמות וגודל המנות"): db.session.query(func.avg(PortionRating.rating)).scalar(),
     } if can_view else {})
     recent = Feedback.query.order_by(Feedback.created_at.desc()).limit(100).all() if can_view else []
     dish_stats = db.session.query(DishRating.dish_slug, DishRating.category, func.avg(DishRating.rating), func.count(DishRating.id)).group_by(DishRating.dish_slug, DishRating.category).order_by(func.avg(DishRating.rating).desc()).all() if can_view else []
