@@ -55,6 +55,8 @@ class AnonymousSubmissionLimitTests(unittest.TestCase):
             "variety_rating": "3",
             "cleanliness_rating": "5",
             "portion_rating": "4",
+            "dish_name": "שניצלים",
+            "dish_rating": "4",
             "comments": "",
         }, follow_redirects=False)
 
@@ -145,7 +147,7 @@ class AnonymousSubmissionLimitTests(unittest.TestCase):
             "variety_rating": "3",
             "cleanliness_rating": "5",
             "portion_rating": "2",
-            "dish_name": "Schnitzel",
+            "dish_name": "שניצלים",
             "dish_rating": "5",
             "comments": "Very tasty",
         })
@@ -154,7 +156,42 @@ class AnonymousSubmissionLimitTests(unittest.TestCase):
             saved = Feedback.query.one()
             self.assertIn("Very tasty", saved.comments)
             self.assertIn("Portion size: 2/5", saved.comments)
-            self.assertIn("Dish feedback: Schnitzel — 5/5", saved.comments)
+            self.assertIn("Dish feedback: שניצלים — 5/5", saved.comments)
+
+    def test_missing_menu_dish_is_rejected_without_saving(self):
+        response = self.client.post("/feedback", data={
+            "meal_date": self.today,
+            "meal_type": "lunch",
+            "food_rating": "4",
+            "taste_rating": "4",
+            "variety_rating": "3",
+            "cleanliness_rating": "5",
+            "portion_rating": "4",
+            "dish_rating": "4",
+            "comments": "",
+        })
+        self.assertEqual(response.status_code, 400)
+        with app.app_context():
+            self.assertEqual(Feedback.query.count(), 0)
+            self.assertEqual(AnonymousSubmission.query.count(), 0)
+
+    def test_unknown_menu_dish_is_rejected_without_saving(self):
+        response = self.client.post("/feedback", data={
+            "meal_date": self.today,
+            "meal_type": "lunch",
+            "food_rating": "4",
+            "taste_rating": "4",
+            "variety_rating": "3",
+            "cleanliness_rating": "5",
+            "portion_rating": "4",
+            "dish_name": "מנה שלא קיימת בתפריט",
+            "dish_rating": "4",
+            "comments": "",
+        })
+        self.assertEqual(response.status_code, 400)
+        with app.app_context():
+            self.assertEqual(Feedback.query.count(), 0)
+            self.assertEqual(AnonymousSubmission.query.count(), 0)
 
     def test_incomplete_dish_feedback_is_rejected_without_saving(self):
         response = self.client.post("/feedback", data={
@@ -182,6 +219,8 @@ class AnonymousSubmissionLimitTests(unittest.TestCase):
             "variety_rating": "3",
             "cleanliness_rating": "5",
             "portion_rating": "9",
+            "dish_name": "שניצלים",
+            "dish_rating": "4",
             "comments": "",
         })
         self.assertEqual(response.status_code, 400)

@@ -52,6 +52,199 @@ APP_BASE_URL = os.environ.get("APP_BASE_URL", "").rstrip("/")
 RESPONDENT_COOKIE = "dining_respondent"
 RESPONDENT_COOKIE_MAX_AGE = 60 * 60 * 24 * 365
 
+MENU_DISHES = [
+    [
+        "thai-meat-noodles",
+        "בשר עם נודלס בסגנון תיאלנדי",
+        "Thai-style meat with noodles"
+    ],
+    [
+        "sweet-chili-shnitzel",
+        "שניצלונים ברוטב צילי מתוק",
+        "Chicken schnitzel bites in sweet chili sauce"
+    ],
+    [
+        "sweet-sour-chicken",
+        "רצועות חזה עוף ברוטב חמוץ מתוק",
+        "Chicken breast strips in sweet and sour sauce"
+    ],
+    [
+        "chicken-mushrooms",
+        "רצועות חזה עוף מוקפצות עם פטריות",
+        "Stir-fried chicken breast strips with mushrooms"
+    ],
+    [
+        "chicken-onion",
+        "חזה עוף עם בצל",
+        "Chicken breast with onion"
+    ],
+    [
+        "bbq-chicken",
+        "חזה עוף ברוטב ברביקיו",
+        "Chicken breast in barbecue sauce"
+    ],
+    [
+        "turkey-mushroom",
+        "חזה הודו ברוטב פטריות",
+        "Turkey breast in mushroom sauce"
+    ],
+    [
+        "sliced-meat-sauces",
+        "גושי בשר בחיתוך של הטבחים עם רטבים",
+        "Chef-cut meat pieces with sauces"
+    ],
+    [
+        "bolognese",
+        "בלונז",
+        "Bolognese"
+    ],
+    [
+        "hamburger",
+        "המבורגר",
+        "Hamburger"
+    ],
+    [
+        "schnitzel",
+        "שניצלים",
+        "Schnitzel"
+    ],
+    [
+        "chicken-on-bone",
+        "עוף עם עצם ברוטב",
+        "Bone-in chicken in sauce"
+    ],
+    [
+        "shawarma",
+        "שווארמה",
+        "Shawarma"
+    ],
+    [
+        "beef-goulash",
+        "גולאש בשר",
+        "Beef goulash"
+    ],
+    [
+        "deli",
+        "דלי",
+        "Deli"
+    ],
+    [
+        "chinese-chicken",
+        "רצועות עוף מוקפצות בסגנון סיני",
+        "Chinese-style stir-fried chicken strips"
+    ],
+    [
+        "meat-focaccia",
+        "פוקצ'ה עם בשר",
+        "Focaccia with meat"
+    ],
+    [
+        "grilled-pargit",
+        "פרגית בגריל",
+        "Grilled pargit (boneless chicken thigh)"
+    ],
+    [
+        "shnitzel-bites",
+        "שניצלונים",
+        "Chicken schnitzel bites"
+    ],
+    [
+        "roast-beef-mushroom",
+        "צלי בשר ברוטב פטריות",
+        "Roast beef in mushroom sauce"
+    ],
+    [
+        "cholent",
+        "צ'ולנט",
+        "Cholent"
+    ],
+    [
+        "deli-roll",
+        "דלי רול",
+        "Deli roll"
+    ],
+    [
+        "kube",
+        "קובה",
+        "Kubeh"
+    ],
+    [
+        "chicken-lettuce-salad",
+        "סלט חסה ועוף",
+        "Chicken and lettuce salad"
+    ],
+    [
+        "potato-kugel",
+        "קוגל תפוחי אדמה",
+        "Potato kugel"
+    ],
+    [
+        "meat-borekas",
+        "בורקס בשר",
+        "Meat bourekas"
+    ],
+    [
+        "pizza",
+        "פיצה",
+        "Pizza"
+    ],
+    [
+        "pasta-sauces",
+        "פסטה ורטבים",
+        "Pasta with choice of sauces"
+    ],
+    [
+        "falafel",
+        "פלאפל",
+        "Falafel"
+    ],
+    [
+        "lasagna",
+        "לזניה",
+        "Lasagna"
+    ],
+    [
+        "salmon",
+        "סלמון",
+        "Salmon"
+    ],
+    [
+        "eggroll",
+        "אגרול",
+        "Egg roll"
+    ],
+    [
+        "fish-chips",
+        "פיש אנד צ'יפס",
+        "Fish and chips"
+    ],
+    [
+        "grilled-cheese",
+        "גריל טוסט",
+        "Grilled cheese toastie"
+    ],
+    [
+        "pizza-pockets",
+        "כיס פיצה",
+        "Pizza pockets"
+    ],
+    [
+        "baked-ziti",
+        "בייקד זיטי",
+        "Baked ziti"
+    ],
+    [
+        "ravioli",
+        "רביולי",
+        "Ravioli"
+    ],
+    [
+        "sushi-bowl",
+        "סושי פתוח",
+        "Sushi bowl"
+    ]
+]
+
 
 class Feedback(db.Model):
     id = db.Column(db.Integer, primary_key=True)
@@ -272,6 +465,7 @@ def common_template_values():
         "language": language,
         "is_hebrew": language == "he",
         "t": translations,
+        "menu_dishes": MENU_DISHES,
     }
 
 
@@ -357,23 +551,20 @@ def feedback():
         if len(comments) > 1000:
             raise ValueError("Comments are too long")
 
-        # Keep the current database schema stable while validating and persisting
-        # the optional structured feedback on the server (not only in browser JS).
+        # The menu choice and its dish rating are mandatory. Validate against the
+        # server-side menu so a client cannot submit arbitrary or missing dishes.
         portion_raw = request.form.get("portion_rating", "").strip()
         portion_value = rating("portion_rating") if portion_raw else None
         dish_name = request.form.get("dish_name", "").strip()
-        dish_rating_raw = request.form.get("dish_rating", "").strip()
-        dish_value = rating("dish_rating") if dish_rating_raw else None
-        if len(dish_name) > 100:
-            raise ValueError("Dish name is too long")
-        if bool(dish_name) != (dish_value is not None):
-            raise ValueError("Dish name and rating must be provided together")
+        allowed_dishes = {dish[1] for dish in MENU_DISHES} | {dish[2] for dish in MENU_DISHES}
+        if dish_name not in allowed_dishes:
+            raise ValueError("A valid menu dish must be selected")
+        dish_value = rating("dish_rating")
 
         metadata = []
         if portion_value is not None:
             metadata.append(translate("Portion size", "כמות המנות") + f": {portion_value}/5")
-        if dish_name and dish_value is not None:
-            metadata.append(translate("Dish feedback", "דירוג מנה") + f": {dish_name} — {dish_value}/5")
+        metadata.append(translate("Dish feedback", "דירוג מנה") + f": {dish_name} — {dish_value}/5")
         if metadata:
             comments = (comments + ("\n\n" if comments else "") + "\n".join(metadata)).strip()
         if len(comments) > 1200:
