@@ -163,7 +163,7 @@ class AnonymousSubmissionLimitTests(unittest.TestCase):
             self.assertIn("Portion size: 2/5", saved.comments)
             self.assertIn("Dish feedback: שניצלים — 5/5", saved.comments)
 
-    def test_missing_menu_dish_is_rejected_without_saving(self):
+    def test_feedback_without_selected_dishes_is_accepted(self):
         response = self.client.post("/feedback", data={
             "meal_date": self.today,
             "meal_type": "lunch",
@@ -172,14 +172,13 @@ class AnonymousSubmissionLimitTests(unittest.TestCase):
             "variety_rating": "3",
             "cleanliness_rating": "5",
             "portion_rating": "4",
-            "dish_rating": "4",
-            "comments": "",
+            "comments": "Overall meal feedback only.",
         })
-        self.assertEqual(response.status_code, 400)
+        self.assertEqual(response.status_code, 302)
         with app.app_context():
-            self.assertEqual(Feedback.query.count(), 0)
-            self.assertEqual(AnonymousSubmission.query.count(), 0)
-
+            self.assertEqual(Feedback.query.count(), 1)
+            self.assertEqual(DishRating.query.count(), 0)
+            self.assertEqual(AnonymousSubmission.query.count(), 1)
     def test_unknown_menu_dish_is_rejected_without_saving(self):
         response = self.client.post("/feedback", data={
             "meal_date": self.today,
@@ -250,61 +249,25 @@ class AnonymousSubmissionLimitTests(unittest.TestCase):
         with app.app_context():
             self.assertEqual(DishRating.query.count(), 2)
             self.assertEqual(sorted(r.rating for r in DishRating.query.all()), [2, 5])
+            self.assertTrue(all(r.category == "dish" for r in DishRating.query.all()))
             self.assertEqual(PortionRating.query.one().rating, 4)
             self.assertEqual(Feedback.query.one().comments, "Both tasted different.")
 
-    def test_weekly_menu_and_daily_override_are_resolved_separately(self):
+    def test_dish_catalog_is_independent_of_weekly_menu_and_daily_override(self):
         from app import MENU_DISHES, menu_items_for
         target = datetime.now(ZoneInfo("Asia/Jerusalem")).date()
         with app.app_context():
-            weekly = WeeklyMenuDish(weekday=target.weekday(), meal_type="lunch",
-                                    dish_slug=MENU_DISHES[0][0], category="main")
-            db.session.add(weekly)
-            db.session.commit()
-            self.assertEqual([x["slug"] for x in menu_items_for(target, "lunch")], [MENU_DISHES[0][0]])
+            db.session.add(WeeklyMenuDish(weekday=target.weekday(), meal_type="lunch",
+                                          dish_slug=MENU_DISHES[0][0], category="main"))
             override = DailyMenuOverride(meal_date=target, meal_type="lunch")
             db.session.add(override)
             db.session.flush()
             db.session.add(DailyMenuDish(menu_id=override.id, dish_slug=MENU_DISHES[1][0], category="side"))
             db.session.commit()
             result = menu_items_for(target, "lunch")
-            self.assertEqual([x["slug"] for x in result], [MENU_DISHES[1][0]])
-            self.assertEqual(result[0]["category"], "side")
-
-    def test_student_menu_api_returns_only_configured_meal_items(self):
-        from app import MENU_DISHES
-        today = datetime.now(ZoneInfo("Asia/Jerusalem")).date()
-        with app.app_context():
-            db.session.add(WeeklyMenuDish(weekday=today.weekday(), meal_type="lunch",
-                                          dish_slug=MENU_DISHES[0][0], category="main"))
-            db.session.commit()
-        response = self.client.get("/api/menu?date=" + self.today + "&meal_type=lunch")
-        self.assertEqual(response.status_code, 200)
-        payload = response.get_json()
-        self.assertTrue(payload["configured"])
-        self.assertEqual(len(payload["dishes"]), 1)
-        self.assertEqual(payload["dishes"][0]["slug"], MENU_DISHES[0][0])
-
-    def test_selected_dish_not_in_configured_menu_is_rejected(self):
-        from app import MENU_DISHES
-        today = datetime.now(ZoneInfo("Asia/Jerusalem")).date()
-        with app.app_context():
-            db.session.add(WeeklyMenuDish(weekday=today.weekday(), meal_type="lunch",
-                                          dish_slug=MENU_DISHES[0][0], category="main"))
-            db.session.commit()
-        response = self.client.post("/feedback", data={
-            "meal_date": self.today, "meal_type": "lunch",
-            "food_rating": "4", "taste_rating": "4", "variety_rating": "4",
-            "cleanliness_rating": "4", "portion_rating": "4",
-            "dish_slug": MENU_DISHES[1][0], "dish_rating_" + MENU_DISHES[1][0]: "4",
-        })
-        self.assertEqual(response.status_code, 400)
-        with app.app_context():
-            self.assertEqual(Feedback.query.count(), 0)
-            self.assertEqual(AnonymousSubmission.query.count(), 0)
-
-
-    def test_explicit_empty_daily_override_does_not_fall_back_to_weekly(self):
+            self.assertEqual([x["slug"] for x in result], [dish[0] for dish in MENU_DISHES])
+            self.assertTrue(all(x["category"] == "dish" for x in result))
+    def test_student_menu_api_always_returns_full_catalog(self):
         from app import MENU_DISHES
         today = datetime.now(ZoneInfo("Asia/Jerusalem")).date()
         with app.app_context():
@@ -316,8 +279,39 @@ class AnonymousSubmissionLimitTests(unittest.TestCase):
         self.assertEqual(response.status_code, 200)
         payload = response.get_json()
         self.assertTrue(payload["configured"])
-        self.assertEqual(payload["dishes"], [])
-
+        self.assertEqual([x["slug"] for x in payload["dishes"]], [dish[0] for dish in MENU_DISHES])
+        self.assertTrue(all(x["category"] == "dish" for x in payload["dishes"]))
+    def test_student_can_rate_any_catalog_dish_without_menu_configuration(self):
+        from app import MENU_DISHES
+        today = datetime.now(ZoneInfo("Asia/Jerusalem")).date()
+        with app.app_context():
+            db.session.add(WeeklyMenuDish(weekday=today.weekday(), meal_type="lunch",
+                                          dish_slug=MENU_DISHES[0][0], category="main"))
+            db.session.commit()
+        response = self.client.post("/feedback", data={
+            "meal_date": self.today, "meal_type": "lunch",
+            "food_rating": "4", "taste_rating": "5", "variety_rating": "3",
+            "cleanliness_rating": "5", "portion_rating": "4",
+            "dish_slug": MENU_DISHES[1][0],
+            "dish_rating_" + MENU_DISHES[1][0]: "4",
+        })
+        self.assertEqual(response.status_code, 302)
+        with app.app_context():
+            self.assertEqual(DishRating.query.count(), 1)
+            self.assertEqual(DishRating.query.one().dish_slug, MENU_DISHES[1][0])
+            self.assertEqual(DishRating.query.one().category, "dish")
+    def test_empty_daily_override_does_not_hide_master_dish_catalog(self):
+        from app import MENU_DISHES
+        today = datetime.now(ZoneInfo("Asia/Jerusalem")).date()
+        with app.app_context():
+            db.session.add(WeeklyMenuDish(weekday=today.weekday(), meal_type="lunch",
+                                          dish_slug=MENU_DISHES[0][0], category="main"))
+            db.session.add(DailyMenuOverride(meal_date=today, meal_type="lunch"))
+            db.session.commit()
+        response = self.client.get("/api/menu?date=" + self.today + "&meal_type=lunch")
+        self.assertEqual(response.status_code, 200)
+        payload = response.get_json()
+        self.assertEqual([x["slug"] for x in payload["dishes"]], [dish[0] for dish in MENU_DISHES])
     def test_portion_rating_is_required_by_server(self):
         from app import MENU_DISHES
         response = self.client.post("/feedback", data={
@@ -361,9 +355,9 @@ class AnonymousSubmissionLimitTests(unittest.TestCase):
                 if path == "/feedback":
                     self.assertIn(b"student-feedback-form", response.data)
                     self.assertIn(b"emoji-rating", response.data)
-                    self.assertIn(b'id="main-dishes"', response.data)
-                    self.assertIn(b'id="side-dishes"', response.data)
-                    self.assertIn(b'id="retry-menu"', response.data)
+                    self.assertIn(b'id="dish-list"', response.data)
+                    self.assertIn(b'id="dish-search"', response.data)
+                    self.assertNotIn(b'weekly menu', response.data.lower())
                     self.assertIn(b"student-feedback.js", response.data)
                     self.assertIn(b"meal_type", response.data)
                 if path == "/feedback/thanks":
