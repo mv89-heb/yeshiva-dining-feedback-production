@@ -515,7 +515,12 @@ def common_template_values():
 
 @app.get("/health")
 def health():
-    return {"status": "ok", "database_configured": bool(os.environ.get("DATABASE_URL"))}, 200
+    return {
+        "status": "ok",
+        "database_configured": bool(os.environ.get("DATABASE_URL")),
+        "commit": os.environ.get("RENDER_GIT_COMMIT"),
+        "branch": os.environ.get("RENDER_GIT_BRANCH"),
+    }, 200
 
 
 @app.get("/ready")
@@ -844,21 +849,111 @@ def dashboard_response():
     actor = current_admin_user()
     can_view = bool(actor and (actor.is_superadmin or actor.can_view_feedback))
     can_manage = bool(actor and (actor.is_superadmin or actor.can_manage_users))
-    total = db.session.query(func.count(Feedback.id)).scalar() or 0 if can_view else 0
-    averages = ({
-        translate("Food quality", "איכות האוכל"): db.session.query(func.avg(Feedback.food_rating)).scalar(),
-        translate("Taste", "טעם"): db.session.query(func.avg(Feedback.taste_rating)).scalar(),
-        translate("Variety", "מגוון"): db.session.query(func.avg(Feedback.variety_rating)).scalar(),
-        translate("Cleanliness", "ניקיון"): db.session.query(func.avg(Feedback.cleanliness_rating)).scalar(),
-        translate("Portion size", "כמות וגודל המנות"): db.session.query(func.avg(PortionRating.rating)).scalar(),
-    } if can_view else {})
-    recent = Feedback.query.order_by(Feedback.created_at.desc()).limit(100).all() if can_view else []
-    dish_stats = db.session.query(DishRating.dish_slug, DishRating.category, func.avg(DishRating.rating), func.count(DishRating.id)).group_by(DishRating.dish_slug, DishRating.category).order_by(func.avg(DishRating.rating).desc()).all() if can_view else []
-    dish_labels = {dish[0]: (dish[1], dish[2]) for dish in MENU_DISHES}
-    dish_results = [{"name": (dish_labels.get(slug, ("", slug))[1] if session.get("language", "en") != "he" else dish_labels.get(slug, ("", slug))[0]), "category": category, "average": average, "count": count} for slug, category, average, count in dish_stats]
-    users = AdminUser.query.order_by(AdminUser.role.desc(), AdminUser.username.asc()).all() if can_manage else []
-    return render_template("admin.html", total=total, averages=averages, recent=recent, users=users, can_view_feedback=can_view, can_manage_users=can_manage, dish_results=dish_results)
 
+    date_from_raw = request.args.get("date_from", "").strip()
+    date_to_raw = request.args.get("date_to", "").strip()
+    meal_filter = request.args.get("meal_type", "").strip().lower()
+    try:
+        date_from = datetime.strptime(date_from_raw, "%Y-%m-%d").date() if date_from_raw else None
+        date_to = datetime.strptime(date_to_raw, "%Y-%m-%d").date() if date_to_raw else None
+    except ValueError:
+        abort(400, description="Invalid dashboard date filter.")
+    if date_from and date_to and date_from > date_to:
+        abort(400, description="The start date must not be after the end date.")
+    if meal_filter not in {"", "breakfast", "lunch", "dinner"}:
+        abort(400, description="Invalid meal filter.")
+
+    feedback_query = Feedback.query
+    if date_from:
+        feedback_query = feedback_query.filter(Feedback.meal_date >= date_from)
+    if date_to:
+        feedback_query = feedback_query.filter(Feedback.meal_date <= date_to)
+    if meal_filter:
+        feedback_query = feedback_query.filter(Feedback.meal_type == meal_filter)
+
+    total = feedback_query.count() if can_view else 0
+    averages = {}
+    recent = []
+    dish_results = []
+    recent_portions = {}
+    recent_dishes = {}
+    if can_view:
+        averages = {
+            translate("Food quality", "איכות האוכל"): feedback_query.with_entities(func.avg(Feedback.food_rating)).scalar(),
+            translate("Taste", "טעם"): feedback_query.with_entities(func.avg(Feedback.taste_rating)).scalar(),
+            translate("Variety", "מגוון"): feedback_query.with_entities(func.avg(Feedback.variety_rating)).scalar(),
+            translate("Cleanliness", "ניקיון"): feedback_query.with_entities(func.avg(Feedback.cleanliness_rating)).scalar(),
+        }
+        portion_query = db.session.query(func.avg(PortionRating.rating)).join(
+            Feedback, Feedback.id == PortionRating.feedback_id
+        )
+        if date_from:
+            portion_query = portion_query.filter(Feedback.meal_date >= date_from)
+        if date_to:
+            portion_query = portion_query.filter(Feedback.meal_date <= date_to)
+        if meal_filter:
+            portion_query = portion_query.filter(Feedback.meal_type == meal_filter)
+        averages[translate("Portion size", "כמות וגודל המנות")] = portion_query.scalar()
+
+        recent = feedback_query.order_by(Feedback.created_at.desc()).limit(100).all()
+        feedback_ids = [item.id for item in recent]
+        if feedback_ids:
+            portion_rows = PortionRating.query.filter(PortionRating.feedback_id.in_(feedback_ids)).all()
+            recent_portions = {row.feedback_id: row.rating for row in portion_rows}
+            dish_rows = DishRating.query.filter(DishRating.feedback_id.in_(feedback_ids)).all()
+            dish_labels = {dish[0]: (dish[1], dish[2]) for dish in MENU_DISHES}
+            for row in dish_rows:
+                labels = dish_labels.get(row.dish_slug, (row.dish_slug, row.dish_slug))
+                label = labels[1] if session.get("language", "en") != "he" else labels[0]
+                recent_dishes.setdefault(row.feedback_id, []).append(f"{label} ({row.rating}/5)")
+            recent_dishes = {key: ", ".join(values) for key, values in recent_dishes.items()}
+
+        dish_query = db.session.query(
+            DishRating.dish_slug,
+            DishRating.category,
+            func.avg(DishRating.rating),
+            func.count(DishRating.id),
+        ).join(Feedback, Feedback.id == DishRating.feedback_id)
+        if date_from:
+            dish_query = dish_query.filter(Feedback.meal_date >= date_from)
+        if date_to:
+            dish_query = dish_query.filter(Feedback.meal_date <= date_to)
+        if meal_filter:
+            dish_query = dish_query.filter(Feedback.meal_type == meal_filter)
+        dish_stats = dish_query.group_by(
+            DishRating.dish_slug, DishRating.category
+        ).order_by(func.avg(DishRating.rating).desc()).all()
+        dish_labels = {dish[0]: (dish[1], dish[2]) for dish in MENU_DISHES}
+        dish_results = [
+            {
+                "name": (
+                    dish_labels.get(slug, ("", slug))[1]
+                    if session.get("language", "en") != "he"
+                    else dish_labels.get(slug, ("", slug))[0]
+                ),
+                "category": category,
+                "average": average,
+                "count": count,
+            }
+            for slug, category, average, count in dish_stats
+        ]
+
+    users = AdminUser.query.order_by(AdminUser.role.desc(), AdminUser.username.asc()).all() if can_manage else []
+    return render_template(
+        "admin.html",
+        total=total,
+        averages=averages,
+        recent=recent,
+        users=users,
+        can_view_feedback=can_view,
+        can_manage_users=can_manage,
+        dish_results=dish_results,
+        recent_portions=recent_portions,
+        recent_dishes=recent_dishes,
+        date_from=date_from_raw,
+        date_to=date_to_raw,
+        meal_filter=meal_filter,
+    )
 
 @app.get("/admin")
 @admin_required

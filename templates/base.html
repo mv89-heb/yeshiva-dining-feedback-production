@@ -16,6 +16,7 @@ main{width:min(1080px,calc(100% - 2.5rem));min-height:calc(100vh - 170px);margin
 @media(max-width:650px){.nav{width:calc(100% - 1.25rem);min-height:68px}.brand-mark{width:36px;height:36px}.brand-subtitle{font-size:.58rem}.nav-right{gap:.5rem}.nav .admin-link{font-size:.82rem}.lang-btn{padding:.45rem .7rem}main{width:calc(100% - 1.25rem);padding:1.4rem 0 2.5rem}.hero{padding:.6rem 0 1rem}.hero h1{font-size:clamp(2rem,10vw,3rem)}.card{border-radius:19px;padding:1.1rem;margin:1rem 0}.rating{gap:.35rem}.rating label{min-height:52px;border-radius:12px}footer{width:calc(100% - 1.25rem)}.table-wrap{margin-inline:-.25rem}th,td{padding:.7rem;min-width:85px}.btn{width:100%}.hero .btn{width:auto}}
 @media(prefers-reduced-motion:reduce){*,*::before,*::after{scroll-behavior:auto!important;transition:none!important}}
 </style>
+{% block head_extra %}{% endblock %}
 </head>
 <body>
 <header><nav class="nav">
@@ -31,4 +32,5 @@ main{width:min(1080px,calc(100% - 2.5rem));min-height:calc(100vh - 170px);margin
 {% block content %}{% endblock %}
 </main>
 <footer class="small">Yeshiva Dining Feedback · {{ current_year }}</footer>
+{% block scripts %}{% endblock %}
 </body></html>
