@@ -15,5 +15,9 @@ jobs:
           python-version: "3.12"
       - name: Install dependencies
         run: python -m pip install -r requirements.txt
+      - name: Install Chromium for real mobile viewport tests
+        run: |
+          python -m pip install playwright
+          python -m playwright install --with-deps chromium
       - name: Run regression tests
         run: python -m unittest discover -s tests -v
