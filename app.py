@@ -612,11 +612,13 @@ def feedback():
         menu_override = DailyMenuOverride.query.filter_by(meal_date=meal_date, meal_type=meal_type).first()
         if menu_override is not None:
             served = {item.dish_slug: item.category for item in menu_override.dishes}
+            menu_configured = True
         else:
             served = {item.dish_slug: item.category for item in WeeklyMenuDish.query.filter_by(weekday=meal_date.weekday(), meal_type=meal_type).all()}
-        if served and any(slug not in served for slug in selected_slugs):
+            menu_configured = bool(served)
+        if menu_configured and any(slug not in served for slug in selected_slugs):
             raise ValueError("A selected dish was not served at this meal")
-        if not served:
+        if not menu_configured:
             served = {slug: "main" for slug in selected_slugs}
         dish_ratings = [(slug, served.get(slug, "main"), rating("dish_rating") if legacy_mode else rating("dish_rating_" + slug)) for slug in selected_slugs]
         if legacy_mode:
@@ -693,7 +695,9 @@ def public_meal_menu():
     except ValueError:
         return {"error": "Invalid date or meal"}, 400
     items = menu_items_for(meal_date, meal_type)
-    return {"date": meal_date.isoformat(), "meal_type": meal_type, "configured": bool(items), "dishes": items}
+    override_exists = DailyMenuOverride.query.filter_by(meal_date=meal_date, meal_type=meal_type).first() is not None
+    configured = override_exists or bool(items)
+    return {"date": meal_date.isoformat(), "meal_type": meal_type, "configured": configured, "dishes": items}
 
 
 @app.route("/admin/menu", methods=["GET", "POST"])
