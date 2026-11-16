@@ -40,23 +40,13 @@
       </div>
     </fieldset>
   </section>
-  <section class="dish-panel">
-    <div class="dish-heading"><span class="dish-icon" aria-hidden="true">🍗</span><div><span class="panel-kicker">{{ "02 / REQUIRED DISH" if not is_hebrew else "02 / בחירת מנה חובה" }}</span><h2>{{ "Which dish are you rating?" if not is_hebrew else "על איזו מנה אתם נותנים משוב?" }}</h2><p>{{ "Choose the dish served in this meal. A dish must be selected before feedback can be sent." if not is_hebrew else "בחרו את המנה שעליה אתם נותנים משוב. לא ניתן לשלוח את הסקר בלי לבחור מנה." }}</p></div></div>
-    <div class="dish-fields">
-      <div class="dish-name-field">
-        <label for="dish-search">{{ "Find a dish" if not is_hebrew else "חיפוש מנה" }}</label>
-        <input id="dish-search" type="search" autocomplete="off" placeholder="{{ 'Search the menu…' if not is_hebrew else 'חיפוש בתפריט…' }}" aria-controls="dish_name">
-        <label for="dish_name">{{ "Menu dish (required)" if not is_hebrew else "בחירת מנה (חובה)" }}</label>
-        <select id="dish_name" name="dish_name" required>
-          <option value="" selected disabled>{{ "Select the dish you ate" if not is_hebrew else "בחרו את המנה שאכלתם" }}</option>
-          {% for slug,he,en in menu_dishes %}
-          <option value="{{ he }}" data-search="{{ (he ~ ' ' ~ en)|lower }}">{{ he }} — {{ en }}</option>
-          {% endfor %}
-        </select>
-      </div>
-      <fieldset class="dish-rating-field"><legend>{{ "Rate this dish (required)" if not is_hebrew else "דירוג המנה (חובה)" }}</legend><div class="dish-stars" role="radiogroup" aria-label="{{ 'Dish rating' if not is_hebrew else 'דירוג המנה' }}">{% for n in range(1,6) %}<label><input type="radio" name="dish_rating" value="{{ n }}" required><span aria-hidden="true">★</span><small>{{ n }}</small></label>{% endfor %}</div></fieldset>
-    </div>
-    <p class="dish-hint">{{ "Both a menu choice and a dish rating are required to submit the survey." if not is_hebrew else "כדי לשלוח את הסקר חובה לבחור מנה ולדרג אותה." }}</p>
+  <section class="dish-panel" id="dish-panel">
+    <div class="dish-heading"><span class="dish-icon" aria-hidden="true">🍽️</span><div><span class="panel-kicker">{{ "02 / DISH-BY-DISH" if not is_hebrew else "02 / דירוג לפי מנה" }}</span><h2>{{ "Which dishes did you eat?" if not is_hebrew else "אילו מנות אכלתם?" }}</h2><p>{{ "Choose every dish you actually ate. Leave uneaten dishes unselected; only selected dishes need a rating." if not is_hebrew else "סמנו את כל המנות שאכלתם בפועל. מנה שלא אכלתם משאירים לא מסומנת ולא מדרגים." }}</p></div></div>
+    <p class="dish-hint" id="menu-status" role="status">{{ "Loading today's menu…" if not is_hebrew else "טוען את תפריט הארוחה…" }}</p>
+    <div id="main-dishes"><h3>{{ "Main dishes" if not is_hebrew else "מנות עיקריות" }}</h3></div>
+    <div id="side-dishes"><h3>{{ "Side dishes" if not is_hebrew else "תוספות" }}</h3></div>
+    <script type="application/json" id="menu-catalog">{{ menu_dishes|tojson }}</script>
+    <p class="dish-hint">{{ "Rate each selected dish from 1 (poor) to 5 (excellent). Ratings are private to the management team." if not is_hebrew else "דרגו כל מנה שסימנתם מ־1 (גרוע) עד 5 (מצוין). התוצאות גלויות להנהלה בלבד." }}</p>
   </section>
   <section class="comments-panel">
     <label for="comments" class="comments-label"><span aria-hidden="true">💬</span><span><strong>{{ "Anything for the kitchen?" if not is_hebrew else "יש משהו לומר למטבח?" }}</strong><small>{{ "Optional · short and specific is best" if not is_hebrew else "לא חובה · קצר וממוקד זה מצוין" }}</small></span></label>
