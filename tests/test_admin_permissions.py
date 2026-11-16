@@ -4,7 +4,7 @@ import unittest
 from datetime import datetime, timedelta
 from zoneinfo import ZoneInfo
 
-from app import app, db, AdminUser, Feedback, PortionRating, DishRating
+from app import app, db, AdminUser, Feedback, PortionRating, DishRating, limiter
 from werkzeug.security import generate_password_hash
 
 
@@ -32,6 +32,7 @@ class AdminPermissionTests(unittest.TestCase):
             os.environ["DATABASE_URL"] = cls.original_database_url
 
     def setUp(self):
+        limiter.reset()
         with app.app_context():
             db.session.remove()
             db.drop_all()
