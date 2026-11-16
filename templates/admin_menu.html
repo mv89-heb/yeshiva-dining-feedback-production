@@ -1,5 +1,37 @@
 {% extends "base.html" %}
-{% block title %}{{ "ניהול תפריטים" if is_hebrew else "Menu management" }} — {{ t.site_name }}{% endblock %}
+{% block title %}{{ "ניהול תפריטים" if is_hebrew else "Menu management" }} — {{ t.site_name }}
+<script>
+(function(){
+ const byId=id=>document.getElementById(id);
+ async function sync(scope){
+  const weekday=byId('weekly-weekday')?.value;
+  const meal=byId(scope==='weekly'?'weekly-meal':'daily-meal')?.value;
+  const date=byId('daily-date')?.value;
+  if(!meal||(scope==='daily'&&!date))return;
+  const params=new URLSearchParams({scope,meal_type:meal});
+  if(scope==='weekly')params.set('weekday',weekday);else params.set('date',date);
+  try{
+   const response=await fetch('/api/admin/menu?'+params.toString(),{headers:{Accept:'application/json'},cache:'no-store'});
+   if(!response.ok)throw new Error('Could not load current menu');
+   const data=await response.json();
+   const prefix=scope==='weekly'?'weekly':'daily';
+   document.querySelectorAll('[id^="'+prefix+'-"]').forEach(el=>{
+    if(el.type==='checkbox')el.checked=false;
+   });
+   (data.dishes||[]).forEach(item=>{
+    const check=byId(prefix+'-'+item.slug);
+    const category=byId(prefix+'-category-'+item.slug);
+    if(check)check.checked=true;
+    if(category)category.value=item.category;
+   });
+  }catch(_error){}
+ }
+ ['weekly-weekday','weekly-meal'].forEach(id=>byId(id)?.addEventListener('change',()=>sync('weekly')));
+ ['daily-date','daily-meal'].forEach(id=>byId(id)?.addEventListener('change',()=>sync('daily')));
+ sync('weekly');sync('daily');
+})();
+</script>
+{% endblock %}
 {% block content %}
 <section class="hero"><p class="eyebrow">{{ "DINING OPERATIONS" if not is_hebrew else "ניהול חדר האוכל" }}</p><h1>{{ "ניהול תפריטים" if is_hebrew else "Menu management" }}</h1><p>{{ "תפריט שבועי כברירת מחדל, עם חריגים לתאריך וארוחה מסוימים." if is_hebrew else "Set a weekly default menu and override it for a specific date and meal." }}</p><a class="btn secondary" href="{{ url_for('admin_dashboard') }}">{{ "חזרה ללוח הניהול" if is_hebrew else "Back to dashboard" }}</a></section>
 <style>
@@ -11,10 +43,10 @@
 <form method="post">
 <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><input type="hidden" name="action" value="weekly">
 <div class="grid">
-<label>{{ "יום בשבוע" if is_hebrew else "Weekday" }}<select name="weekday" required>{% for n,label in [(6,"Sunday / ראשון"),(0,"Monday / שני"),(1,"Tuesday / שלישי"),(2,"Wednesday / רביעי"),(3,"Thursday / חמישי"),(4,"Friday / שישי"),(5,"Saturday / שבת")] %}<option value="{{ n }}">{{ label }}</option>{% endfor %}</select></label>
-<label>{{ "ארוחה" if is_hebrew else "Meal" }}<select name="meal_type"><option value="breakfast">{{ "ארוחת בוקר" if is_hebrew else "Breakfast" }}</option><option value="lunch">{{ "ארוחת צהריים" if is_hebrew else "Lunch" }}</option><option value="dinner">{{ "ארוחת ערב" if is_hebrew else "Dinner" }}</option></select></label>
+<label>{{ "יום בשבוע" if is_hebrew else "Weekday" }}<select id="weekly-weekday" name="weekday" required>{% for n,label in [(6,"Sunday / ראשון"),(0,"Monday / שני"),(1,"Tuesday / שלישי"),(2,"Wednesday / רביעי"),(3,"Thursday / חמישי"),(4,"Friday / שישי"),(5,"Saturday / שבת")] %}<option value="{{ n }}">{{ label }}</option>{% endfor %}</select></label>
+<label>{{ "ארוחה" if is_hebrew else "Meal" }}<select id="weekly-meal" name="meal_type"><option value="breakfast">{{ "ארוחת בוקר" if is_hebrew else "Breakfast" }}</option><option value="lunch">{{ "ארוחת צהריים" if is_hebrew else "Lunch" }}</option><option value="dinner">{{ "ארוחת ערב" if is_hebrew else "Dinner" }}</option></select></label>
 </div>
-<div class="dish-list">{% for slug,he,en in menu_dishes %}<div class="dish-row"><input type="checkbox" name="dish_slug" value="{{ slug }}" id="weekly-{{ slug }}"><label for="weekly-{{ slug }}">{{ he }}<small class="muted" style="display:block">{{ en }}</small></label><select name="category_{{ slug }}" aria-label="Category for {{ en }}"><option value="main">{{ "עיקרית" if is_hebrew else "Main" }}</option><option value="side">{{ "תוספת" if is_hebrew else "Side" }}</option></select></div>{% endfor %}</div>
+<div class="dish-list">{% for slug,he,en in menu_dishes %}<div class="dish-row"><input type="checkbox" name="dish_slug" value="{{ slug }}" id="weekly-{{ slug }}"><label for="weekly-{{ slug }}">{{ he }}<small class="muted" style="display:block">{{ en }}</small></label><select id="weekly-category-{{ slug }}" name="category_{{ slug }}" aria-label="Category for {{ en }}"><option value="main">{{ "עיקרית" if is_hebrew else "Main" }}</option><option value="side">{{ "תוספת" if is_hebrew else "Side" }}</option></select></div>{% endfor %}</div>
 <button class="btn" type="submit">{{ "שמירת תפריט שבועי" if is_hebrew else "Save weekly menu" }}</button>
 </form>
 </section>
@@ -23,8 +55,8 @@
 <p class="muted small">{{ "החריג גובר על התפריט השבועי רק בתאריך ובארוחה שנבחרו. גם תפריט ריק הוא חריג מפורש." if is_hebrew else "This replaces the weekly menu only for the selected date and meal. An empty selection is also an explicit override." }}</p>
 <form method="post">
 <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><input type="hidden" name="action" value="daily">
-<div class="grid"><label>{{ "תאריך" if is_hebrew else "Date" }}<input type="date" name="meal_date" required></label><label>{{ "ארוחה" if is_hebrew else "Meal" }}<select name="meal_type"><option value="breakfast">Breakfast</option><option value="lunch">Lunch</option><option value="dinner">Dinner</option></select></label></div>
-<div class="dish-list">{% for slug,he,en in menu_dishes %}<div class="dish-row"><input type="checkbox" name="dish_slug" value="{{ slug }}" id="daily-{{ slug }}"><label for="daily-{{ slug }}">{{ he }}<small class="muted" style="display:block">{{ en }}</small></label><select name="category_{{ slug }}" aria-label="Category for {{ en }}"><option value="main">{{ "עיקרית" if is_hebrew else "Main" }}</option><option value="side">{{ "תוספת" if is_hebrew else "Side" }}</option></select></div>{% endfor %}</div>
+<div class="grid"><label>{{ "תאריך" if is_hebrew else "Date" }}<input id="daily-date" type="date" name="meal_date" required></label><label>{{ "ארוחה" if is_hebrew else "Meal" }}<select id="daily-meal" name="meal_type"><option value="breakfast">Breakfast</option><option value="lunch">Lunch</option><option value="dinner">Dinner</option></select></label></div>
+<div class="dish-list">{% for slug,he,en in menu_dishes %}<div class="dish-row"><input type="checkbox" name="dish_slug" value="{{ slug }}" id="daily-{{ slug }}"><label for="daily-{{ slug }}">{{ he }}<small class="muted" style="display:block">{{ en }}</small></label><select id="daily-category-{{ slug }}" name="category_{{ slug }}" aria-label="Category for {{ en }}"><option value="main">{{ "עיקרית" if is_hebrew else "Main" }}</option><option value="side">{{ "תוספת" if is_hebrew else "Side" }}</option></select></div>{% endfor %}</div>
 <button class="btn" type="submit">{{ "שמירת שינוי לתאריך" if is_hebrew else "Save date override" }}</button>
 </form>
 </section>
