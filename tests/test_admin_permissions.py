@@ -91,12 +91,12 @@ class AdminPermissionTests(unittest.TestCase):
         self.assertIn(b'href="#recent-feedback"', dashboard.data)
         self.assertIn(b"/admin/qr-flyer", dashboard.data)
         self.assertIn(b"@media(max-width:700px)", dashboard.data)
-        self.assertIn(b"Mobile-first data cards", dashboard.data)
+        self.assertIn(b"One coherent phone layout", dashboard.data)
         self.assertIn(b"data-label=", dashboard.data)
         self.assertIn(b"New password", dashboard.data)
         self.assertIn(b"overflow-x:clip", dashboard.data)
         self.assertIn(b"flex-wrap:wrap", dashboard.data)
-        self.assertIn(b"table-layout:fixed", dashboard.data)
+        self.assertIn(b".admin-page tbody{display:grid", dashboard.data)
         self.assertIn(b"min-width:0", dashboard.data)
 
     def test_mobile_layout_rules_cover_shared_header_admin_and_student_pages(self):
@@ -104,9 +104,9 @@ class AdminPermissionTests(unittest.TestCase):
         dashboard = self.client.get("/admin")
         self.assertEqual(dashboard.status_code, 200)
         for rule in (
-            b".nav{display:grid;grid-template-columns:minmax(0,1fr)",
+            b".nav{display:flex;flex-direction:column;align-items:stretch",
             b"main{width:calc(100% - 1rem)",
-            b".admin-page .admin-hero{width:100%",
+            b".admin-page .admin-hero{display:flex;flex-direction:column",
             b".admin-page .qr-card{display:grid;grid-template-columns:minmax(0,1fr)",
             b".admin-page .admin-filters{display:grid;grid-template-columns:minmax(0,1fr)",
         ):
