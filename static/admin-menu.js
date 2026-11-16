@@ -11,8 +11,11 @@
     const meal=byId(scope==='weekly'?'weekly-meal':'daily-meal')?.value;
     const date=byId('daily-date')?.value;
     const status=byId(scope+'-menu-status');
+    const form=byId(scope+'-menu-form');
+    const submit=form?.querySelector('button[type="submit"]');
     if(!meal||(scope==='daily'&&!date))return;
     const current=++sequence[scope];
+    if(submit)submit.disabled=true;
     if(status)status.textContent=labels[lang].loading;
     const params=new URLSearchParams({scope,meal_type:meal});
     if(scope==='weekly')params.set('weekday',weekday);else params.set('date',date);
@@ -30,6 +33,7 @@
         if(category)category.value=item.category;
       });
       if(status)status.textContent=scope==='weekly'?labels[lang].weekly:(data.override?labels[lang].override:labels[lang].inherited);
+      if(submit)submit.disabled=false;
     }catch(error){if(current===sequence[scope]&&status)status.textContent=labels[lang].error;}
   }
   ['weekly-weekday','weekly-meal'].forEach(id=>byId(id)?.addEventListener('change',()=>sync('weekly')));
