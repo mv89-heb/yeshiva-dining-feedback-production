@@ -90,6 +90,10 @@ class AdminPermissionTests(unittest.TestCase):
         self.assertIn(b'class="admin-shortcuts"', dashboard.data)
         self.assertIn(b'href="#recent-feedback"', dashboard.data)
         self.assertIn(b"/admin/qr-flyer", dashboard.data)
+        self.assertIn(b"@media(max-width:700px)", dashboard.data)
+        self.assertIn(b"Mobile-first data cards", dashboard.data)
+        self.assertIn(b"data-label=", dashboard.data)
+        self.assertIn(b"New password", dashboard.data)
 
     def test_dashboard_filters_feedback_by_date_and_meal(self):
         today = datetime.now(ZoneInfo("Asia/Jerusalem")).date()
