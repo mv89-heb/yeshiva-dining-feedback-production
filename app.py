@@ -605,27 +605,23 @@ def feedback():
         legacy_mode = False
         if not selected_slugs:
             legacy_name = request.form.get("dish_name", "").strip()
-            legacy = next((d for d in MENU_DISHES if legacy_name in {d[1], d[2]}), None)
-            if legacy:
+            if legacy_name:
+                legacy = next((d for d in MENU_DISHES if legacy_name in {d[1], d[2]}), None)
+                if legacy is None:
+                    raise ValueError("A selected dish is not in the catalog")
                 legacy_mode = True
                 selected_slugs = [legacy[0]]
-        if not selected_slugs or len(selected_slugs) != len(set(selected_slugs)):
-            raise ValueError("Select at least one dish, without duplicates")
+        if len(selected_slugs) != len(set(selected_slugs)):
+            raise ValueError("A dish cannot be selected more than once")
         valid_slugs = {dish[0] for dish in MENU_DISHES}
         if any(slug not in valid_slugs for slug in selected_slugs):
-            raise ValueError("A selected dish is not in the menu")
-        menu_override = DailyMenuOverride.query.filter_by(meal_date=meal_date, meal_type=meal_type).first()
-        if menu_override is not None:
-            served = {item.dish_slug: item.category for item in menu_override.dishes}
-            menu_configured = True
-        else:
-            served = {item.dish_slug: item.category for item in WeeklyMenuDish.query.filter_by(weekday=meal_date.weekday(), meal_type=meal_type).all()}
-            menu_configured = bool(served)
-        if menu_configured and any(slug not in served for slug in selected_slugs):
-            raise ValueError("A selected dish was not served at this meal")
-        if not menu_configured:
-            served = {slug: "main" for slug in selected_slugs}
-        dish_ratings = [(slug, served.get(slug, "main"), rating("dish_rating") if legacy_mode else rating("dish_rating_" + slug)) for slug in selected_slugs]
+            raise ValueError("A selected dish is not in the catalog")
+        # Dish selection is optional. Students may rate any subset of the master catalog,
+        # independent of weekly menus or date-specific overrides.
+        dish_ratings = [
+            (slug, "dish", rating("dish_rating") if legacy_mode else rating("dish_rating_" + slug))
+            for slug in selected_slugs
+        ]
         if legacy_mode:
             comments = (comments + ("\n\n" if comments else "") + f"Portion size: {portion_value}/5\nDish feedback: {next(d[1] for d in MENU_DISHES if d[0] == selected_slugs[0])} — {dish_ratings[0][2]}/5").strip()
         if len(comments) > 1200:
@@ -678,15 +674,12 @@ def feedback():
 
 
 
-def menu_items_for(meal_date, meal_type):
-    override = DailyMenuOverride.query.filter_by(meal_date=meal_date, meal_type=meal_type).first()
-    if override is not None:
-        rows = [(item.dish_slug, item.category) for item in override.dishes]
-    else:
-        rows = [(item.dish_slug, item.category) for item in WeeklyMenuDish.query.filter_by(weekday=meal_date.weekday(), meal_type=meal_type).all()]
-    by_slug = {dish[0]: dish for dish in MENU_DISHES}
-    return [{"slug": slug, "he": by_slug[slug][1], "en": by_slug[slug][2], "category": category}
-            for slug, category in rows if slug in by_slug]
+def menu_items_for(meal_date=None, meal_type=None):
+    """Return the complete dish catalog; availability is no longer scheduled by week/day."""
+    return [
+        {"slug": slug, "he": hebrew_name, "en": english_name, "category": "dish"}
+        for slug, hebrew_name, english_name in MENU_DISHES
+    ]
 
 
 @app.get("/api/menu")
@@ -699,10 +692,8 @@ def public_meal_menu():
             raise ValueError()
     except ValueError:
         return {"error": "Invalid date or meal"}, 400
-    items = menu_items_for(meal_date, meal_type)
-    override_exists = DailyMenuOverride.query.filter_by(meal_date=meal_date, meal_type=meal_type).first() is not None
-    configured = override_exists or bool(items)
-    return {"date": meal_date.isoformat(), "meal_type": meal_type, "configured": configured, "dishes": items}
+    items = menu_items_for()
+    return {"date": meal_date.isoformat(), "meal_type": meal_type, "configured": True, "dishes": items}
 
 
 @app.get("/api/admin/menu")
@@ -737,68 +728,12 @@ def admin_menu_data():
 @app.route("/admin/menu", methods=["GET", "POST"])
 @permission_required("can_manage_users")
 def admin_menu():
-    valid_meals = {"breakfast", "lunch", "dinner"}
-    valid_slugs = {dish[0] for dish in MENU_DISHES}
-    if request.method == "POST":
-        action = request.form.get("action", "")
-        meal_type = request.form.get("meal_type", "").strip().lower()
-        if meal_type not in valid_meals:
-            abort(400)
-        if action == "clear_daily":
-            try:
-                target_date = datetime.strptime(request.form.get("meal_date", ""), "%Y-%m-%d").date()
-            except ValueError:
-                abort(400)
-            override = DailyMenuOverride.query.filter_by(meal_date=target_date, meal_type=meal_type).first()
-            if override is not None:
-                db.session.delete(override)
-            admin_audit("removed daily menu override")
-            db.session.commit()
-            flash(translate("Daily override removed. The weekly menu is active again.", "החריג הוסר והתפריט השבועי חזר להיות פעיל."), "success")
-            return redirect(url_for("admin_menu"))
-        selected = request.form.getlist("dish_slug")
-        if len(selected) != len(set(selected)) or any(slug not in valid_slugs for slug in selected):
-            abort(400)
-        entries = []
-        for slug in selected:
-            category = request.form.get("category_" + slug, "main")
-            if category not in {"main", "side"}:
-                abort(400)
-            entries.append((slug, category))
-        if action == "weekly":
-            try:
-                weekday = int(request.form.get("weekday", "-1"))
-                if weekday not in range(7):
-                    raise ValueError()
-            except ValueError:
-                abort(400)
-            WeeklyMenuDish.query.filter_by(weekday=weekday, meal_type=meal_type).delete()
-            for slug, category in entries:
-                db.session.add(WeeklyMenuDish(weekday=weekday, meal_type=meal_type, dish_slug=slug, category=category))
-            admin_audit("updated weekly menu")
-        elif action == "daily":
-            try:
-                target_date = datetime.strptime(request.form.get("meal_date", ""), "%Y-%m-%d").date()
-            except ValueError:
-                abort(400)
-            override = DailyMenuOverride.query.filter_by(meal_date=target_date, meal_type=meal_type).first()
-            if override is None:
-                override = DailyMenuOverride(meal_date=target_date, meal_type=meal_type)
-                db.session.add(override)
-                db.session.flush()
-            else:
-                DailyMenuDish.query.filter_by(menu_id=override.id).delete()
-            for slug, category in entries:
-                db.session.add(DailyMenuDish(menu_id=override.id, dish_slug=slug, category=category))
-            admin_audit("updated daily menu override")
-        else:
-            abort(400)
-        db.session.commit()
-        flash(translate("Menu saved.", "התפריט נשמר בהצלחה."), "success")
-        return redirect(url_for("admin_menu"))
-    weekly = WeeklyMenuDish.query.order_by(WeeklyMenuDish.weekday, WeeklyMenuDish.meal_type).all()
-    overrides = DailyMenuOverride.query.order_by(DailyMenuOverride.meal_date.desc()).limit(30).all()
-    return render_template("admin_menu.html", weekly=weekly, overrides=overrides, menu_dishes=MENU_DISHES)
+    """Retain the old URL for bookmarks, but retire weekly and daily menu management."""
+    flash(translate(
+        "Weekly menu scheduling has been retired. Students can choose any dishes from the full catalog.",
+        "ניהול התפריט השבועי בוטל. התלמידים יכולים לבחור כל מנה מתוך הרשימה המלאה."
+    ), "info")
+    return redirect(url_for("admin_dashboard"))
 
 
 @app.get("/feedback/thanks")
