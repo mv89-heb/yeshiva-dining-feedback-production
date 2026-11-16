@@ -98,7 +98,7 @@ jobs:
           assert login[0] == 200 and b'name="username"' in login[3] and b'name="password"' in login[3], "manager login form missing"
           for path, label in [("/admin", "admin dashboard"), ("/admin/menu", "menu editor"), ("/api/admin/menu?scope=weekly&weekday=0&meal_type=lunch", "admin menu API"), ("/admin/qr.png", "QR endpoint")]:
               protected = request(path)
-              assert protected[0] == 302 and protected[1].rstrip("/").endswith("/admin/login"), f"{label} is not protected"
+              assert protected[0] == 200 and protected[1].rstrip("/").endswith("/admin/login"), f"{label} is not protected (final HTTP {protected[0]} at {protected[1]})"
 
           print("PASS: exact deployed commit, health/readiness, student form, menu API, JS asset, EN/HE direction, and protected manager routes.")
           print("Read-only: no student feedback was submitted.")
