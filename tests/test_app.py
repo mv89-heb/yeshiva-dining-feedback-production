@@ -64,6 +64,11 @@ class AnonymousSubmissionLimitTests(unittest.TestCase):
         live = self.client.get("/live")
         self.assertEqual(live.status_code, 200)
         self.assertEqual(live.get_json(), {"status": "alive"})
+        health = self.client.get("/health")
+        self.assertEqual(health.status_code, 200)
+        self.assertEqual(health.get_json()["status"], "ok")
+        self.assertIn("commit", health.get_json())
+        self.assertIn("branch", health.get_json())
 
         ready = self.client.get("/ready")
         self.assertEqual(ready.status_code, 200)
