@@ -43,108 +43,49 @@
 #user-management input[type=checkbox]{width:17px!important;height:17px;vertical-align:middle}
 #user-management td label{display:block;margin:.3rem 0!important;font-size:.84rem}
 #user-management td input[type=password]{min-width:155px}
+
+/* One coherent phone layout: all dashboard sections flow in the reading direction. */
 @media(max-width:700px){
- .admin-hero{align-items:flex-start;flex-direction:column;gap:.8rem;border-radius:19px;padding:1.15rem}
- .admin-hero>form,.admin-hero>form .btn{width:auto}
- .admin-shortcuts{gap:.2rem}.admin-shortcuts a{font-size:.78rem;padding:.4rem .6rem}
- .qr-card{display:grid;grid-template-columns:minmax(0,1fr) 116px;gap:.35rem .7rem}
- .qr-card>div[style*="text-align:center"]{grid-column:2;grid-row:1/5;padding:.4rem!important}
- .qr-card img{width:100%!important}
- .qr-card>div .btn{font-size:.72rem;padding:.45rem .3rem}
- .qr-flyer-link{margin:.35rem 0 0;width:100%}
- .admin-stats{grid-template-columns:repeat(2,minmax(0,1fr));gap:.55rem}
- .admin-stats .card{padding:.85rem}.admin-stats .total-stat{grid-column:1/-1}
- .admin-stats .total-stat .stat{font-size:2rem}
- .admin-filters label{flex:1 1 42%;min-width:0}
- .admin-filters .btn{flex:1}
-}
-@media(max-width:390px){.qr-card{grid-template-columns:1fr}.qr-card>div[style*="text-align:center"]{grid-column:1;grid-row:auto;max-width:190px;margin:.5rem auto!important}.qr-card .admin-section-kicker,.qr-card h2,.qr-card>p:not(.small),.qr-card>.small{grid-column:1}}
-
-/* Mobile-first data cards: preserve every field without forcing sideways table scrolling. */
-@media(max-width:700px){
- .admin-page .table-wrap{overflow:visible;border:0;background:transparent}
- .admin-page table{display:block;width:100%;border:0;background:transparent}
- .admin-page thead{position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap;border:0}
- .admin-page tbody{display:grid;gap:.75rem}
- .admin-page tbody tr{display:grid;grid-template-columns:minmax(0,1fr);min-width:0;overflow:hidden;border:1px solid #dce5dc;border-radius:15px;background:#fffefa;box-shadow:0 5px 16px rgba(24,58,45,.055)}
- .admin-page tbody td{display:grid;grid-template-columns:minmax(6.5rem,36%) minmax(0,1fr);align-items:start;gap:.55rem;min-width:0;padding:.68rem .8rem;border-bottom:1px solid #edf1eb;overflow-wrap:anywhere}
- .admin-page tbody td:before{content:attr(data-label);color:#65756a;font-size:.73rem;font-weight:850;line-height:1.45}
- .admin-page tbody td:last-child{border-bottom:0}
- .admin-page tbody td[colspan]{display:block;padding:.9rem;text-align:center}
- .admin-page tbody td[colspan]:before{content:none}
- .admin-page tbody td input:not([type=checkbox]),#user-management td input[type=password]{width:100%;min-width:0;max-width:100%}
- .admin-page tbody td .btn{width:100%;min-height:42px;padding:.55rem .65rem}
- #user-management .table-wrap{overflow:visible}
- #user-management td label{line-height:1.45}
- #user-management td input[type=checkbox]{width:18px!important;height:18px;vertical-align:middle}
-}
-@media(max-width:390px){
- .admin-page tbody td{grid-template-columns:minmax(5.6rem,34%) minmax(0,1fr);gap:.45rem;padding:.62rem .68rem;font-size:.84rem}
- .admin-page tbody td:before{font-size:.69rem}
- .admin-hero h1{font-size:1.85rem}
- .admin-shortcuts a{min-height:40px}
- .admin-filters label{flex-basis:100%}
- .admin-filters .btn{flex:1 1 100%}
-}
-
-
-/* Prevent viewport-wide horizontal scrolling on phones, including the shared header. */
-@media(max-width:700px){
- html,body{width:100%;max-width:100%;overflow-x:clip}
- body{min-width:0}
- header,.nav,main,footer{min-width:0;max-width:100%}
- .nav{flex-wrap:wrap;padding-block:.45rem}
- .brand{flex:1 1 12rem;min-width:0;max-width:100%}
- .brand-copy{min-width:0}
- .brand-copy>span:first-child{overflow-wrap:anywhere}
- .nav-right{flex:0 1 auto;min-width:0;max-width:100%}
- main{width:calc(100% - 1rem);padding-inline:0}
- .admin-page,.admin-page *{box-sizing:border-box;min-width:0}
- .admin-page{width:100%;max-width:100%;overflow-x:clip}
- .admin-page .card,.admin-page .table-wrap{width:100%;max-width:100%}
- .admin-page .table-wrap{overflow-x:clip}
- .admin-page table{width:100%;max-width:100%;table-layout:fixed}
- .admin-page th,.admin-page td{white-space:normal;overflow-wrap:anywhere;word-break:normal}
- .admin-hero>*{min-width:0;max-width:100%}
- .admin-shortcuts{max-width:100%}
- .qr-card{min-width:0}
- .admin-page img,.admin-page input,.admin-page select,.admin-page button,.admin-page a{max-width:100%}
-}
-
-
-/* Phone layout: one readable column; no side-by-side content wider than the viewport. */
-@media(max-width:700px){
-  .admin-page{width:100%;max-width:100%;min-width:0}
-  .admin-page .admin-hero{width:100%;display:flex;flex-direction:column;align-items:stretch;gap:.65rem;padding:1rem}
-  .admin-page .admin-hero h1{font-size:clamp(1.65rem,8vw,2.2rem);overflow-wrap:anywhere}
-  .admin-page .admin-hero>form,.admin-page .admin-hero>form .btn{width:100%}
-  .admin-page .admin-shortcuts{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));width:100%;gap:.35rem}
-  .admin-page .admin-shortcuts a{justify-content:center;text-align:center;min-width:0;overflow-wrap:anywhere}
-  .admin-page .qr-card{display:grid;grid-template-columns:minmax(0,1fr);width:100%;gap:.5rem}
-  .admin-page .qr-card>*{grid-column:1!important;grid-row:auto!important;min-width:0;max-width:100%}
-  .admin-page .qr-card>div[style*="text-align:center"]{width:100%;max-width:220px;margin:.25rem auto!important}
-  .admin-page .qr-card img{width:100%!important;max-width:180px!important}
-  .admin-page .qr-flyer-link{width:100%;margin:.35rem 0}
-  .admin-page .admin-stats{grid-template-columns:repeat(2,minmax(0,1fr));width:100%}
-  .admin-page .admin-stats>.card{min-width:0}
+  .admin-page{display:block;width:100%;max-width:100%;min-width:0;margin:0}
+  .admin-page *{box-sizing:border-box;min-width:0}
+  .admin-page .admin-hero{display:flex;flex-direction:column;align-items:stretch;gap:.7rem;width:100%;max-width:100%;padding:1rem;border-radius:18px}
+  .admin-page .admin-hero h1{font-size:clamp(1.6rem,8vw,2.1rem);max-width:100%;overflow-wrap:anywhere}
+  .admin-page .admin-hero>form,.admin-page .admin-hero>form .btn{width:100%;max-width:100%}
+  .admin-page .admin-shortcuts{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:.35rem;width:100%;max-width:100%;padding:.4rem}
+  .admin-page .admin-shortcuts a{display:flex;justify-content:center;align-items:center;min-width:0;min-height:42px;padding:.4rem;text-align:center;white-space:normal;overflow-wrap:anywhere}
+  .admin-page .qr-card{display:grid;grid-template-columns:minmax(0,1fr);gap:.65rem;width:100%;max-width:100%;padding:1rem}
+  .admin-page .qr-card>*{grid-column:auto!important;grid-row:auto!important;width:100%;max-width:100%;min-width:0}
+  .admin-page .qr-card>div[style*="text-align:center"]{width:100%;max-width:190px;margin:.25rem auto!important;padding:.5rem!important}
+  .admin-page .qr-card img{display:block;width:100%!important;max-width:170px!important;height:auto;margin:auto}
+  .admin-page .qr-card .btn,.admin-page .qr-flyer-link{width:100%;max-width:100%;margin:.35rem 0}
+  .admin-page .admin-stats{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:.5rem;width:100%;max-width:100%}
+  .admin-page .admin-stats>.card{width:100%;min-width:0;padding:.75rem}
   .admin-page .admin-stats .total-stat{grid-column:1/-1}
-  .admin-page .admin-filters{display:grid;grid-template-columns:minmax(0,1fr);width:100%}
-  .admin-page .admin-filters label{width:100%;min-width:0}
-  .admin-page .admin-filters input,.admin-page .admin-filters select,.admin-page .admin-filters .btn{width:100%;min-width:0}
-  .admin-page .table-wrap{width:100%;max-width:100%;min-width:0}
-  .admin-page table{width:100%;max-width:100%;min-width:0}
-  .admin-page tbody tr{width:100%;max-width:100%;min-width:0}
-  .admin-page tbody td{grid-template-columns:minmax(5.2rem,34%) minmax(0,1fr);min-width:0}
-  #user-management form .grid{grid-template-columns:minmax(0,1fr)}
-  #user-management td input[type=password]{min-width:0;width:100%}
+  .admin-page .admin-stats .stat,.admin-page .admin-stats .total-stat .stat{font-size:clamp(1.45rem,7vw,2rem);overflow-wrap:anywhere}
+  .admin-page .admin-filters{display:grid;grid-template-columns:minmax(0,1fr);align-items:stretch;gap:.6rem;width:100%;max-width:100%;padding:.75rem}
+  .admin-page .admin-filters label{display:grid;width:100%;min-width:0}
+  .admin-page .admin-filters input,.admin-page .admin-filters select,.admin-page .admin-filters .btn,.admin-page .admin-filters>a{width:100%;max-width:100%;min-width:0}
+  .admin-page .table-wrap{width:100%;max-width:100%;min-width:0;overflow:visible;border:0;background:transparent}
+  .admin-page table{display:block;width:100%;max-width:100%;min-width:0;border:0;background:transparent;table-layout:auto}
+  .admin-page thead{position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap;border:0}
+  .admin-page tbody{display:grid;grid-template-columns:minmax(0,1fr);gap:.7rem;width:100%;max-width:100%;min-width:0}
+  .admin-page tbody tr{display:grid;grid-template-columns:minmax(0,1fr);width:100%;max-width:100%;min-width:0;overflow:hidden;border:1px solid #dce5dc;border-radius:14px;background:#fffefa;box-shadow:0 4px 14px rgba(24,58,45,.05)}
+  .admin-page tbody td{display:grid;grid-template-columns:minmax(5.5rem,34%) minmax(0,1fr);align-items:start;gap:.45rem;width:100%;max-width:100%;min-width:0;padding:.65rem .7rem;white-space:normal;overflow-wrap:anywhere;word-break:normal;border-bottom:1px solid #edf1eb}
+  .admin-page tbody td:before{content:attr(data-label);min-width:0;color:#65756a;font-size:.7rem;font-weight:850;line-height:1.4}
+  .admin-page tbody td:last-child{border-bottom:0}
+  .admin-page tbody td[colspan]{display:block;padding:.85rem;text-align:center}
+  .admin-page tbody td[colspan]:before{content:none}
+  .admin-page tbody td input:not([type=checkbox]),.admin-page tbody td select{width:100%;max-width:100%;min-width:0}
+  .admin-page tbody td .btn{width:100%;max-width:100%;min-height:42px;padding:.5rem}
+  #user-management form .grid{display:grid;grid-template-columns:minmax(0,1fr);width:100%;max-width:100%}
+  #user-management td input[type=password]{width:100%;max-width:100%;min-width:0}
 }
 @media(max-width:360px){
   .admin-page .admin-shortcuts{grid-template-columns:minmax(0,1fr)}
-  .admin-page .admin-stats{gap:.4rem}
-  .admin-page .admin-stats .card{padding:.7rem}
-  .admin-page tbody td{grid-template-columns:minmax(4.6rem,32%) minmax(0,1fr);gap:.35rem;padding:.58rem}
+  .admin-page .admin-stats{gap:.35rem}
+  .admin-page tbody td{grid-template-columns:minmax(4.7rem,32%) minmax(0,1fr);gap:.35rem;padding:.58rem}
+  .admin-page tbody td:before{font-size:.66rem}
 }
-
 </style>{% endblock %}
 {% block content %}<div class="admin-page"><section class="hero admin-hero"><p class="eyebrow">{{ t.management }}</p><h1>{{ t.admin_dashboard }}</h1><p>{{ t.connected_as }} {{ session.get('admin_username', 'Manager' if not is_hebrew else 'מנהל/ת') }}</p><form method="post" action="{{ url_for('admin_logout') }}"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><button class="btn secondary" type="submit">{{ t.logout }}</button></form></section>{% if can_view_feedback %}<nav class="admin-shortcuts" aria-label="Dashboard sections"><a href="#overview">{{ "סקירה" if is_hebrew else "Overview" }}</a><a href="#recent-feedback">{{ "משובים אחרונים" if is_hebrew else "Recent feedback" }}</a><a href="#dish-ratings">{{ "דירוגי מנות" if is_hebrew else "Dish ratings" }}</a>{% if can_manage_users %}<a href="#user-management">{{ "משתמשים" if is_hebrew else "Users" }}</a>{% endif %}</nav><section class="card qr-card"><div class="admin-section-kicker">{{ "SHARE THE FORM" if not is_hebrew else "שיתוף הטופס" }}</div><h2>{{ t.qr_title }}</h2><p>{{ t.qr_desc }}</p><div style="text-align:center;padding:1rem"><img src="{{ url_for('admin_qr_code') }}" alt="{{ t.qr_alt }}" style="width:min(100%,320px);height:auto;background:white;padding:12px;border:1px solid #dce6e0;border-radius:12px"><p><a class="btn" href="{{ url_for('admin_qr_code') }}" download="yeshiva-dining-feedback-qr.png">{{ t.download_qr }}</a></p></div><p class="small muted">{{ t.duplicate_limit }}</p><div><a class="qr-flyer-link" href="{{ url_for('admin_qr_flyer') }}" target="_blank" rel="noopener">{{ "פתיחת פלייר להדפסה" if is_hebrew else "Open printable flyer" }}</a></div></section><div class="grid admin-stats" id="overview"><section class="card total-stat"><div class="muted">{{ t.total_feedback }}</div><div class="stat">{{ total }}</div></section>{% for label,value in averages.items() %}<section class="card"><div class="muted">{{ label }}</div><div class="stat">{{ '%.2f'|format(value) if value is not none else '—' }} <span class="small">/ 5</span></div></section>{% endfor %}</div><section class="card" id="recent-feedback"><h2>{{ t.latest_feedback }}</h2><p class="muted small">{{ t.latest_desc }}</p>
 <form class="admin-filters" method="get" action="{{ url_for('admin_dashboard') }}">
