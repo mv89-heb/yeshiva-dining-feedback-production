@@ -708,8 +708,22 @@ def admin_menu():
     if request.method == "POST":
         action = request.form.get("action", "")
         meal_type = request.form.get("meal_type", "").strip().lower()
+        if meal_type not in valid_meals:
+            abort(400)
+        if action == "clear_daily":
+            try:
+                target_date = datetime.strptime(request.form.get("meal_date", ""), "%Y-%m-%d").date()
+            except ValueError:
+                abort(400)
+            override = DailyMenuOverride.query.filter_by(meal_date=target_date, meal_type=meal_type).first()
+            if override is not None:
+                db.session.delete(override)
+            admin_audit("removed daily menu override")
+            db.session.commit()
+            flash(translate("Daily override removed. The weekly menu is active again.", "החריג הוסר והתפריט השבועי חזר להיות פעיל."), "success")
+            return redirect(url_for("admin_menu"))
         selected = request.form.getlist("dish_slug")
-        if meal_type not in valid_meals or len(selected) != len(set(selected)) or any(slug not in valid_slugs for slug in selected):
+        if len(selected) != len(set(selected)) or any(slug not in valid_slugs for slug in selected):
             abort(400)
         entries = []
         for slug in selected:
