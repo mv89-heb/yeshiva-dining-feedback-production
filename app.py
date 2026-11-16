@@ -700,6 +700,35 @@ def public_meal_menu():
     return {"date": meal_date.isoformat(), "meal_type": meal_type, "configured": configured, "dishes": items}
 
 
+@app.get("/api/admin/menu")
+@permission_required("can_manage_users")
+def admin_menu_data():
+    scope = request.args.get("scope", "weekly")
+    meal_type = request.args.get("meal_type", "").strip().lower()
+    if meal_type not in {"breakfast", "lunch", "dinner"}:
+        return {"error": "Invalid meal"}, 400
+    if scope == "weekly":
+        try:
+            weekday = int(request.args.get("weekday", "-1"))
+            if weekday not in range(7):
+                raise ValueError()
+        except ValueError:
+            return {"error": "Invalid weekday"}, 400
+        rows = WeeklyMenuDish.query.filter_by(weekday=weekday, meal_type=meal_type).all()
+        return {"override": False, "dishes": [{"slug": x.dish_slug, "category": x.category} for x in rows]}
+    if scope == "daily":
+        try:
+            target_date = datetime.strptime(request.args.get("date", ""), "%Y-%m-%d").date()
+        except ValueError:
+            return {"error": "Invalid date"}, 400
+        override = DailyMenuOverride.query.filter_by(meal_date=target_date, meal_type=meal_type).first()
+        if override is None:
+            rows = WeeklyMenuDish.query.filter_by(weekday=target_date.weekday(), meal_type=meal_type).all()
+            return {"override": False, "dishes": [{"slug": x.dish_slug, "category": x.category} for x in rows]}
+        return {"override": True, "dishes": [{"slug": x.dish_slug, "category": x.category} for x in override.dishes]}
+    return {"error": "Invalid scope"}, 400
+
+
 @app.route("/admin/menu", methods=["GET", "POST"])
 @permission_required("can_manage_users")
 def admin_menu():
