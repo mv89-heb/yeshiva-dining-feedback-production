@@ -111,6 +111,40 @@
  .admin-page img,.admin-page input,.admin-page select,.admin-page button,.admin-page a{max-width:100%}
 }
 
+
+/* Phone layout: one readable column; no side-by-side content wider than the viewport. */
+@media(max-width:700px){
+  .admin-page{width:100%;max-width:100%;min-width:0}
+  .admin-page .admin-hero{width:100%;display:flex;flex-direction:column;align-items:stretch;gap:.65rem;padding:1rem}
+  .admin-page .admin-hero h1{font-size:clamp(1.65rem,8vw,2.2rem);overflow-wrap:anywhere}
+  .admin-page .admin-hero>form,.admin-page .admin-hero>form .btn{width:100%}
+  .admin-page .admin-shortcuts{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));width:100%;gap:.35rem}
+  .admin-page .admin-shortcuts a{justify-content:center;text-align:center;min-width:0;overflow-wrap:anywhere}
+  .admin-page .qr-card{display:grid;grid-template-columns:minmax(0,1fr);width:100%;gap:.5rem}
+  .admin-page .qr-card>*{grid-column:1!important;grid-row:auto!important;min-width:0;max-width:100%}
+  .admin-page .qr-card>div[style*="text-align:center"]{width:100%;max-width:220px;margin:.25rem auto!important}
+  .admin-page .qr-card img{width:100%!important;max-width:180px!important}
+  .admin-page .qr-flyer-link{width:100%;margin:.35rem 0}
+  .admin-page .admin-stats{grid-template-columns:repeat(2,minmax(0,1fr));width:100%}
+  .admin-page .admin-stats>.card{min-width:0}
+  .admin-page .admin-stats .total-stat{grid-column:1/-1}
+  .admin-page .admin-filters{display:grid;grid-template-columns:minmax(0,1fr);width:100%}
+  .admin-page .admin-filters label{width:100%;min-width:0}
+  .admin-page .admin-filters input,.admin-page .admin-filters select,.admin-page .admin-filters .btn{width:100%;min-width:0}
+  .admin-page .table-wrap{width:100%;max-width:100%;min-width:0}
+  .admin-page table{width:100%;max-width:100%;min-width:0}
+  .admin-page tbody tr{width:100%;max-width:100%;min-width:0}
+  .admin-page tbody td{grid-template-columns:minmax(5.2rem,34%) minmax(0,1fr);min-width:0}
+  #user-management form .grid{grid-template-columns:minmax(0,1fr)}
+  #user-management td input[type=password]{min-width:0;width:100%}
+}
+@media(max-width:360px){
+  .admin-page .admin-shortcuts{grid-template-columns:minmax(0,1fr)}
+  .admin-page .admin-stats{gap:.4rem}
+  .admin-page .admin-stats .card{padding:.7rem}
+  .admin-page tbody td{grid-template-columns:minmax(4.6rem,32%) minmax(0,1fr);gap:.35rem;padding:.58rem}
+}
+
 </style>{% endblock %}
 {% block content %}<div class="admin-page"><section class="hero admin-hero"><p class="eyebrow">{{ t.management }}</p><h1>{{ t.admin_dashboard }}</h1><p>{{ t.connected_as }} {{ session.get('admin_username', 'Manager' if not is_hebrew else 'מנהל/ת') }}</p><form method="post" action="{{ url_for('admin_logout') }}"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><button class="btn secondary" type="submit">{{ t.logout }}</button></form></section>{% if can_view_feedback %}<nav class="admin-shortcuts" aria-label="Dashboard sections"><a href="#overview">{{ "סקירה" if is_hebrew else "Overview" }}</a><a href="#recent-feedback">{{ "משובים אחרונים" if is_hebrew else "Recent feedback" }}</a><a href="#dish-ratings">{{ "דירוגי מנות" if is_hebrew else "Dish ratings" }}</a>{% if can_manage_users %}<a href="#user-management">{{ "משתמשים" if is_hebrew else "Users" }}</a>{% endif %}</nav><section class="card qr-card"><div class="admin-section-kicker">{{ "SHARE THE FORM" if not is_hebrew else "שיתוף הטופס" }}</div><h2>{{ t.qr_title }}</h2><p>{{ t.qr_desc }}</p><div style="text-align:center;padding:1rem"><img src="{{ url_for('admin_qr_code') }}" alt="{{ t.qr_alt }}" style="width:min(100%,320px);height:auto;background:white;padding:12px;border:1px solid #dce6e0;border-radius:12px"><p><a class="btn" href="{{ url_for('admin_qr_code') }}" download="yeshiva-dining-feedback-qr.png">{{ t.download_qr }}</a></p></div><p class="small muted">{{ t.duplicate_limit }}</p><div><a class="qr-flyer-link" href="{{ url_for('admin_qr_flyer') }}" target="_blank" rel="noopener">{{ "פתיחת פלייר להדפסה" if is_hebrew else "Open printable flyer" }}</a></div></section><div class="grid admin-stats" id="overview"><section class="card total-stat"><div class="muted">{{ t.total_feedback }}</div><div class="stat">{{ total }}</div></section>{% for label,value in averages.items() %}<section class="card"><div class="muted">{{ label }}</div><div class="stat">{{ '%.2f'|format(value) if value is not none else '—' }} <span class="small">/ 5</span></div></section>{% endfor %}</div><section class="card" id="recent-feedback"><h2>{{ t.latest_feedback }}</h2><p class="muted small">{{ t.latest_desc }}</p>
 <form class="admin-filters" method="get" action="{{ url_for('admin_dashboard') }}">
