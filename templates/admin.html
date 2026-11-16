@@ -87,6 +87,30 @@
  .admin-filters .btn{flex:1 1 100%}
 }
 
+
+/* Prevent viewport-wide horizontal scrolling on phones, including the shared header. */
+@media(max-width:700px){
+ html,body{width:100%;max-width:100%;overflow-x:clip}
+ body{min-width:0}
+ header,.nav,main,footer{min-width:0;max-width:100%}
+ .nav{flex-wrap:wrap;padding-block:.45rem}
+ .brand{flex:1 1 12rem;min-width:0;max-width:100%}
+ .brand-copy{min-width:0}
+ .brand-copy>span:first-child{overflow-wrap:anywhere}
+ .nav-right{flex:0 1 auto;min-width:0;max-width:100%}
+ main{width:calc(100% - 1rem);padding-inline:0}
+ .admin-page,.admin-page *{box-sizing:border-box;min-width:0}
+ .admin-page{width:100%;max-width:100%;overflow-x:clip}
+ .admin-page .card,.admin-page .table-wrap{width:100%;max-width:100%}
+ .admin-page .table-wrap{overflow-x:clip}
+ .admin-page table{width:100%;max-width:100%;table-layout:fixed}
+ .admin-page th,.admin-page td{white-space:normal;overflow-wrap:anywhere;word-break:normal}
+ .admin-hero>*{min-width:0;max-width:100%}
+ .admin-shortcuts{max-width:100%}
+ .qr-card{min-width:0}
+ .admin-page img,.admin-page input,.admin-page select,.admin-page button,.admin-page a{max-width:100%}
+}
+
 </style>{% endblock %}
 {% block content %}<div class="admin-page"><section class="hero admin-hero"><p class="eyebrow">{{ t.management }}</p><h1>{{ t.admin_dashboard }}</h1><p>{{ t.connected_as }} {{ session.get('admin_username', 'Manager' if not is_hebrew else 'מנהל/ת') }}</p><form method="post" action="{{ url_for('admin_logout') }}"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><button class="btn secondary" type="submit">{{ t.logout }}</button></form></section>{% if can_view_feedback %}<nav class="admin-shortcuts" aria-label="Dashboard sections"><a href="#overview">{{ "סקירה" if is_hebrew else "Overview" }}</a><a href="#recent-feedback">{{ "משובים אחרונים" if is_hebrew else "Recent feedback" }}</a><a href="#dish-ratings">{{ "דירוגי מנות" if is_hebrew else "Dish ratings" }}</a>{% if can_manage_users %}<a href="#user-management">{{ "משתמשים" if is_hebrew else "Users" }}</a>{% endif %}</nav><section class="card qr-card"><div class="admin-section-kicker">{{ "SHARE THE FORM" if not is_hebrew else "שיתוף הטופס" }}</div><h2>{{ t.qr_title }}</h2><p>{{ t.qr_desc }}</p><div style="text-align:center;padding:1rem"><img src="{{ url_for('admin_qr_code') }}" alt="{{ t.qr_alt }}" style="width:min(100%,320px);height:auto;background:white;padding:12px;border:1px solid #dce6e0;border-radius:12px"><p><a class="btn" href="{{ url_for('admin_qr_code') }}" download="yeshiva-dining-feedback-qr.png">{{ t.download_qr }}</a></p></div><p class="small muted">{{ t.duplicate_limit }}</p><div><a class="qr-flyer-link" href="{{ url_for('admin_qr_flyer') }}" target="_blank" rel="noopener">{{ "פתיחת פלייר להדפסה" if is_hebrew else "Open printable flyer" }}</a></div></section><div class="grid admin-stats" id="overview"><section class="card total-stat"><div class="muted">{{ t.total_feedback }}</div><div class="stat">{{ total }}</div></section>{% for label,value in averages.items() %}<section class="card"><div class="muted">{{ label }}</div><div class="stat">{{ '%.2f'|format(value) if value is not none else '—' }} <span class="small">/ 5</span></div></section>{% endfor %}</div><section class="card" id="recent-feedback"><h2>{{ t.latest_feedback }}</h2><p class="muted small">{{ t.latest_desc }}</p>
 <form class="admin-filters" method="get" action="{{ url_for('admin_dashboard') }}">
