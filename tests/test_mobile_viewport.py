@@ -82,7 +82,22 @@ class MobileViewportTests(unittest.TestCase):
                         rootWidth: document.documentElement.scrollWidth,
                         bodyWidth: document.body.scrollWidth,
                         mainLeft: rect.left,
-                        mainRight: rect.right
+                        mainRight: rect.right,
+                        overflowingElements: [...document.querySelectorAll('body *')]
+                          .map(el => {
+                            const r = el.getBoundingClientRect();
+                            const style = getComputedStyle(el);
+                            return {
+                              tag: el.tagName.toLowerCase(),
+                              className: typeof el.className === "string" ? el.className : "",
+                              left: Math.round(r.left),
+                              right: Math.round(r.right),
+                              width: Math.round(r.width),
+                              position: style.position
+                            };
+                          })
+                          .filter(el => el.width > 0 && (el.left < -1 || el.right > window.innerWidth + 1))
+                          .slice(0, 8)
                       };
                     }""")
                     self.assertLessEqual(
