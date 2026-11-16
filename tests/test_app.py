@@ -7,7 +7,7 @@ import unittest
 from datetime import datetime
 from zoneinfo import ZoneInfo
 
-from app import app, db, Feedback, AnonymousSubmission, AdminUser, limiter
+from app import app, db, Feedback, AnonymousSubmission, AdminUser, DishRating, PortionRating, WeeklyMenuDish, DailyMenuOverride, DailyMenuDish, limiter
 from werkzeug.security import generate_password_hash
 
 
@@ -228,7 +228,76 @@ class AnonymousSubmissionLimitTests(unittest.TestCase):
             self.assertEqual(Feedback.query.count(), 0)
             self.assertEqual(AnonymousSubmission.query.count(), 0)
 
-    def test_language_switch_rejects_backslash_redirect(self):
+
+    def test_multiple_selected_dishes_are_saved_as_independent_ratings(self):
+        from app import MENU_DISHES
+        response = self.client.post("/feedback", data={
+            "meal_date": self.today,
+            "meal_type": "lunch",
+            "food_rating": "4", "taste_rating": "5", "variety_rating": "3",
+            "cleanliness_rating": "5", "portion_rating": "4",
+            "dish_slug": [MENU_DISHES[0][0], MENU_DISHES[1][0]],
+            "dish_rating_" + MENU_DISHES[0][0]: "5",
+            "dish_rating_" + MENU_DISHES[1][0]: "2",
+            "comments": "Both tasted different.",
+        })
+        self.assertEqual(response.status_code, 302)
+        with app.app_context():
+            self.assertEqual(DishRating.query.count(), 2)
+            self.assertEqual(sorted(r.rating for r in DishRating.query.all()), [2, 5])
+            self.assertEqual(PortionRating.query.one().rating, 4)
+            self.assertEqual(Feedback.query.one().comments, "Both tasted different.")
+
+    def test_weekly_menu_and_daily_override_are_resolved_separately(self):
+        from app import MENU_DISHES, menu_items_for
+        target = datetime.now(ZoneInfo("Asia/Jerusalem")).date()
+        with app.app_context():
+            weekly = WeeklyMenuDish(weekday=target.weekday(), meal_type="lunch",
+                                    dish_slug=MENU_DISHES[0][0], category="main")
+            db.session.add(weekly)
+            db.session.commit()
+            self.assertEqual([x["slug"] for x in menu_items_for(target, "lunch")], [MENU_DISHES[0][0]])
+            override = DailyMenuOverride(meal_date=target, meal_type="lunch")
+            db.session.add(override)
+            db.session.flush()
+            db.session.add(DailyMenuDish(menu_id=override.id, dish_slug=MENU_DISHES[1][0], category="side"))
+            db.session.commit()
+            result = menu_items_for(target, "lunch")
+            self.assertEqual([x["slug"] for x in result], [MENU_DISHES[1][0]])
+            self.assertEqual(result[0]["category"], "side")
+
+    def test_student_menu_api_returns_only_configured_meal_items(self):
+        from app import MENU_DISHES
+        today = datetime.now(ZoneInfo("Asia/Jerusalem")).date()
+        with app.app_context():
+            db.session.add(WeeklyMenuDish(weekday=today.weekday(), meal_type="lunch",
+                                          dish_slug=MENU_DISHES[0][0], category="main"))
+            db.session.commit()
+        response = self.client.get("/api/menu?date=" + self.today + "&meal_type=lunch")
+        self.assertEqual(response.status_code, 200)
+        payload = response.get_json()
+        self.assertTrue(payload["configured"])
+        self.assertEqual(len(payload["dishes"]), 1)
+        self.assertEqual(payload["dishes"][0]["slug"], MENU_DISHES[0][0])
+
+    def test_selected_dish_not_in_configured_menu_is_rejected(self):
+        from app import MENU_DISHES
+        today = datetime.now(ZoneInfo("Asia/Jerusalem")).date()
+        with app.app_context():
+            db.session.add(WeeklyMenuDish(weekday=today.weekday(), meal_type="lunch",
+                                          dish_slug=MENU_DISHES[0][0], category="main"))
+            db.session.commit()
+        response = self.client.post("/feedback", data={
+            "meal_date": self.today, "meal_type": "lunch",
+            "food_rating": "4", "taste_rating": "4", "variety_rating": "4",
+            "cleanliness_rating": "4", "portion_rating": "4",
+            "dish_slug": MENU_DISHES[1][0], "dish_rating_" + MENU_DISHES[1][0]: "4",
+        })
+        self.assertEqual(response.status_code, 400)
+        with app.app_context():
+            self.assertEqual(Feedback.query.count(), 0)
+            self.assertEqual(AnonymousSubmission.query.count(), 0)
+\n    def test_language_switch_rejects_backslash_redirect(self):
         response = self.client.post("/language", data={
             "language": "he",
             "next": "/\\\\evil.example",
@@ -253,7 +322,7 @@ class AnonymousSubmissionLimitTests(unittest.TestCase):
                 if path == "/feedback":
                     self.assertIn(b"student-feedback-form", response.data)
                     self.assertIn(b"emoji-rating", response.data)
-                    self.assertIn(b"dish_name", response.data)
+                    self.assertIn(b"dish_slug", response.data)\n                    self.assertIn(b"main-dishes", response.data)
                     self.assertIn(b"meal_type", response.data)
                 if path == "/feedback/thanks":
                     self.assertIn(b"FEEDBACK RECEIVED", response.data)
