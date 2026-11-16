@@ -297,7 +297,8 @@ class AnonymousSubmissionLimitTests(unittest.TestCase):
         with app.app_context():
             self.assertEqual(Feedback.query.count(), 0)
             self.assertEqual(AnonymousSubmission.query.count(), 0)
-\n    def test_language_switch_rejects_backslash_redirect(self):
+
+    def test_language_switch_rejects_backslash_redirect(self):
         response = self.client.post("/language", data={
             "language": "he",
             "next": "/\\\\evil.example",
