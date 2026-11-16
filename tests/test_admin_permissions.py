@@ -99,6 +99,24 @@ class AdminPermissionTests(unittest.TestCase):
         self.assertIn(b"table-layout:fixed", dashboard.data)
         self.assertIn(b"min-width:0", dashboard.data)
 
+    def test_mobile_layout_rules_cover_shared_header_admin_and_student_pages(self):
+        self.login("admin", "StrongTestPassword1!")
+        dashboard = self.client.get("/admin")
+        self.assertEqual(dashboard.status_code, 200)
+        for rule in (
+            b".nav{display:grid;grid-template-columns:minmax(0,1fr)",
+            b"main{width:calc(100% - 1rem)",
+            b".admin-page .admin-hero{width:100%",
+            b".admin-page .qr-card{display:grid;grid-template-columns:minmax(0,1fr)",
+            b".admin-page .admin-filters{display:grid;grid-template-columns:minmax(0,1fr)",
+        ):
+            self.assertIn(rule, dashboard.data)
+
+        student = self.client.get("/feedback")
+        self.assertEqual(student.status_code, 200)
+        self.assertIn(b".dish-list{grid-template-columns:minmax(0,1fr)", student.data)
+        self.assertIn(b".emoji-rating{grid-template-columns:repeat(5,minmax(0,1fr))", student.data)
+
     def test_dashboard_filters_feedback_by_date_and_meal(self):
         today = datetime.now(ZoneInfo("Asia/Jerusalem")).date()
         yesterday = today - timedelta(days=1)
