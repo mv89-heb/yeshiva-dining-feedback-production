@@ -66,6 +66,31 @@ class AdminPermissionTests(unittest.TestCase):
         self.assertNotIn(b"Manage menus", dashboard.data)
         self.assertNotIn("ניהול תפריטים".encode("utf-8"), dashboard.data)
 
+    def test_qr_flyer_is_protected_bilingual_and_uses_live_qr_endpoint(self):
+        denied = self.client.get("/admin/qr-flyer", follow_redirects=False)
+        self.assertEqual(denied.status_code, 302)
+        self.assertIn("/admin/login", denied.headers["Location"])
+
+        self.login("admin", "StrongTestPassword1!")
+        flyer = self.client.get("/admin/qr-flyer")
+        self.assertEqual(flyer.status_code, 200)
+        self.assertIn(b"How was your meal?", flyer.data)
+        self.assertIn("איך הייתה הארוחה שלכם?".encode("utf-8"), flyer.data)
+        self.assertIn(b"/admin/qr.png", flyer.data)
+        self.assertIn(b"print-flyer", flyer.data)
+
+        qr = self.client.get("/admin/qr.png")
+        self.assertEqual(qr.status_code, 200)
+        self.assertTrue(qr.mimetype.startswith("image/png"))
+
+    def test_admin_dashboard_has_clear_section_navigation_and_flyer_link(self):
+        self.login("admin", "StrongTestPassword1!")
+        dashboard = self.client.get("/admin")
+        self.assertEqual(dashboard.status_code, 200)
+        self.assertIn(b'class="admin-shortcuts"', dashboard.data)
+        self.assertIn(b'href="#recent-feedback"', dashboard.data)
+        self.assertIn(b"/admin/qr-flyer", dashboard.data)
+
     def test_dashboard_filters_feedback_by_date_and_meal(self):
         today = datetime.now(ZoneInfo("Asia/Jerusalem")).date()
         yesterday = today - timedelta(days=1)
