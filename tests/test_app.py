@@ -363,6 +363,8 @@ class AnonymousSubmissionLimitTests(unittest.TestCase):
                     self.assertIn(b"emoji-rating", response.data)
                     self.assertIn(b'id="main-dishes"', response.data)
                     self.assertIn(b'id="side-dishes"', response.data)
+                    self.assertIn(b'id="retry-menu"', response.data)
+                    self.assertIn(b"student-feedback.js", response.data)
                     self.assertIn(b"meal_type", response.data)
                 if path == "/feedback/thanks":
                     self.assertIn(b"FEEDBACK RECEIVED", response.data)
