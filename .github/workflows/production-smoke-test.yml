@@ -64,9 +64,9 @@ jobs:
           assert feedback[0] == 200, f"feedback page returned HTTP {feedback[0]}"
           assert b'<html lang="en" dir="ltr">' in feedback[3], "English should be the default language"
           assert b'id="student-feedback-form"' in feedback[3], "student form missing"
-          assert b'id="main-dishes"' in feedback[3] and b'id="side-dishes"' in feedback[3], "multi-dish containers missing"
+          assert b'id="dish-list"' in feedback[3] and b'id="dish-search"' in feedback[3], "optional dish catalog or search missing"
           assert b'name="portion_rating"' in feedback[3], "portion rating missing"
-          assert b'id="retry-menu"' in feedback[3], "menu retry control missing"
+          assert b"No dishes selected" in feedback[3], "dish selection should remain optional"
           assert b'student-feedback.js' in feedback[3], "student interaction script missing"
           assert any(cookie.name == "dining_respondent" for cookie in jar), "anonymous browser cookie missing"
 
@@ -76,8 +76,13 @@ jobs:
           menu_data = json.loads(menu[3])
           assert menu_data.get("date") == today and menu_data.get("meal_type") == "lunch", "menu API returned wrong meal context"
           assert isinstance(menu_data.get("configured"), bool) and isinstance(menu_data.get("dishes"), list), "menu API response shape invalid"
+          catalog_match = re.search(rb'<script type="application/json" id="menu-catalog">(.*?)</script>', feedback[3], re.S)
+          assert catalog_match, "embedded master dish catalog missing"
+          catalog = json.loads(catalog_match.group(1))
+          assert [item.get("slug") for item in menu_data["dishes"]] == [item[0] for item in catalog], "API must return the full master catalog"
+          assert all(item.get("category") == "dish" for item in menu_data["dishes"]), "new catalog must not depend on main/side weekly categories"
           student_js = request("/static/student-feedback.js")
-          assert student_js[0] == 200 and b"AbortController" in student_js[3], "student menu script missing race protection"
+          assert student_js[0] == 200 and b"updateCount" in student_js[3] and b"dish_rating_" in student_js[3], "optional dish selection script missing"
 
           csrf_match = re.search(rb'name="csrf_token" value="([^"]+)"', feedback[3])
           assert csrf_match, "feedback CSRF token missing"
@@ -100,6 +105,6 @@ jobs:
               protected = request(path)
               assert protected[0] == 200 and protected[1].rstrip("/").endswith("/admin/login"), f"{label} is not protected (final HTTP {protected[0]} at {protected[1]})"
 
-          print("PASS: exact deployed commit, health/readiness, student form, menu API, JS asset, EN/HE direction, and protected manager routes.")
+          print("PASS: exact deployed commit, health/readiness, optional full dish catalog, dish search, EN/HE direction, and protected manager routes.")
           print("Read-only: no student feedback was submitted.")
           PY
