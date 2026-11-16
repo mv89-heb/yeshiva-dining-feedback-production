@@ -8,7 +8,7 @@
 <section class="menu-editor">
 <h2>{{ "תפריט שבועי קבוע" if is_hebrew else "Weekly default menu" }}</h2>
 <p class="muted small">{{ "בחרו יום, ארוחה, וסמנו את כל המנות שיוגשו. לכל מנה בחרו עיקרית או תוספת." if is_hebrew else "Choose a weekday and meal, then select the dishes and classify each as main or side." }}</p>
-<form method="post">
+<form id="weekly-menu-form" method="post">
 <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><input type="hidden" name="action" value="weekly">
 <div class="grid">
 <label>{{ "יום בשבוע" if is_hebrew else "Weekday" }}<select id="weekly-weekday" name="weekday" required>{% for n,label in [(6,"Sunday / ראשון"),(0,"Monday / שני"),(1,"Tuesday / שלישי"),(2,"Wednesday / רביעי"),(3,"Thursday / חמישי"),(4,"Friday / שישי"),(5,"Saturday / שבת")] %}<option value="{{ n }}" {% if n == current_date.weekday() %}selected{% endif %}>{{ label }}</option>{% endfor %}</select></label>
@@ -22,7 +22,7 @@
 <section class="menu-editor">
 <h2>{{ "שינוי חד-פעמי לתאריך מסוים" if is_hebrew else "One-time date override" }}</h2>
 <p class="muted small">{{ "החריג גובר על התפריט השבועי רק בתאריך ובארוחה שנבחרו. גם תפריט ריק הוא חריג מפורש." if is_hebrew else "This replaces the weekly menu only for the selected date and meal. An empty selection is also an explicit override." }}</p>
-<form method="post">
+<form id="daily-menu-form" method="post">
 <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><input type="hidden" name="action" value="daily">
 <div class="grid"><label>{{ "תאריך" if is_hebrew else "Date" }}<input id="daily-date" type="date" name="meal_date" value="{{ current_date.isoformat() }}" required></label><label>{{ "ארוחה" if is_hebrew else "Meal" }}<select id="daily-meal" name="meal_type"><option value="breakfast">Breakfast</option><option value="lunch">Lunch</option><option value="dinner">Dinner</option></select></label></div>
 <p class="muted small" id="daily-menu-status" role="status" aria-live="polite"></p>
