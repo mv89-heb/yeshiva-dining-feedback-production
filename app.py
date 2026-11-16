@@ -258,6 +258,50 @@ class Feedback(db.Model):
     created_at = db.Column(db.DateTime(timezone=True), nullable=False, default=lambda: datetime.now(timezone.utc), index=True)
 
 
+class WeeklyMenuDish(db.Model):
+    __tablename__ = "weekly_menu_dishes"
+    id = db.Column(db.Integer, primary_key=True)
+    weekday = db.Column(db.Integer, nullable=False)
+    meal_type = db.Column(db.String(20), nullable=False)
+    dish_slug = db.Column(db.String(80), nullable=False)
+    category = db.Column(db.String(20), nullable=False)
+    __table_args__ = (UniqueConstraint("weekday", "meal_type", "dish_slug", name="uq_weekly_menu_dish"),)
+
+
+class DailyMenuOverride(db.Model):
+    __tablename__ = "daily_menu_overrides"
+    id = db.Column(db.Integer, primary_key=True)
+    meal_date = db.Column(db.Date, nullable=False)
+    meal_type = db.Column(db.String(20), nullable=False)
+    dishes = db.relationship("DailyMenuDish", cascade="all, delete-orphan", backref="menu")
+    __table_args__ = (UniqueConstraint("meal_date", "meal_type", name="uq_daily_menu_override"),)
+
+
+class DailyMenuDish(db.Model):
+    __tablename__ = "daily_menu_dishes"
+    id = db.Column(db.Integer, primary_key=True)
+    menu_id = db.Column(db.Integer, db.ForeignKey("daily_menu_overrides.id", ondelete="CASCADE"), nullable=False)
+    dish_slug = db.Column(db.String(80), nullable=False)
+    category = db.Column(db.String(20), nullable=False)
+    __table_args__ = (UniqueConstraint("menu_id", "dish_slug", name="uq_daily_menu_dish"),)
+
+
+class DishRating(db.Model):
+    __tablename__ = "dish_ratings"
+    id = db.Column(db.Integer, primary_key=True)
+    feedback_id = db.Column(db.Integer, db.ForeignKey("feedback.id", ondelete="CASCADE"), nullable=False, index=True)
+    dish_slug = db.Column(db.String(80), nullable=False, index=True)
+    category = db.Column(db.String(20), nullable=False)
+    rating = db.Column(db.Integer, nullable=False)
+    __table_args__ = (UniqueConstraint("feedback_id", "dish_slug", name="uq_feedback_dish_rating"),)
+
+class PortionRating(db.Model):
+    __tablename__ = "portion_ratings"
+    id = db.Column(db.Integer, primary_key=True)
+    feedback_id = db.Column(db.Integer, db.ForeignKey("feedback.id", ondelete="CASCADE"), nullable=False, unique=True, index=True)
+    rating = db.Column(db.Integer, nullable=False)
+
+
 class AnonymousSubmission(db.Model):
     __tablename__ = "anonymous_submissions"
     id = db.Column(db.Integer, primary_key=True)
@@ -551,24 +595,36 @@ def feedback():
         if len(comments) > 1000:
             raise ValueError("Comments are too long")
 
-        # The menu choice and its dish rating are mandatory. Validate against the
-        # server-side menu so a client cannot submit arbitrary or missing dishes.
-        portion_raw = request.form.get("portion_rating", "").strip()
-        portion_value = rating("portion_rating") if portion_raw else None
-        dish_name = request.form.get("dish_name", "").strip()
-        allowed_dishes = {dish[1] for dish in MENU_DISHES} | {dish[2] for dish in MENU_DISHES}
-        if dish_name not in allowed_dishes:
-            raise ValueError("A valid menu dish must be selected")
-        dish_value = rating("dish_rating")
-
-        metadata = []
-        if portion_value is not None:
-            metadata.append(translate("Portion size", "כמות המנות") + f": {portion_value}/5")
-        metadata.append(translate("Dish feedback", "דירוג מנה") + f": {dish_name} — {dish_value}/5")
-        if metadata:
-            comments = (comments + ("\n\n" if comments else "") + "\n".join(metadata)).strip()
+        portion_value = rating("portion_rating")
+        selected_slugs = request.form.getlist("dish_slug")
+        legacy_mode = False
+        if not selected_slugs:
+            legacy_name = request.form.get("dish_name", "").strip()
+            legacy = next((d for d in MENU_DISHES if legacy_name in {d[1], d[2]}), None)
+            if legacy:
+                legacy_mode = True
+                selected_slugs = [legacy[0]]
+        if not selected_slugs or len(selected_slugs) != len(set(selected_slugs)):
+            raise ValueError("Select at least one dish, without duplicates")
+        valid_slugs = {dish[0] for dish in MENU_DISHES}
+        if any(slug not in valid_slugs for slug in selected_slugs):
+            raise ValueError("A selected dish is not in the menu")
+        menu_override = DailyMenuOverride.query.filter_by(meal_date=meal_date, meal_type=meal_type).first()
+        if menu_override is not None:
+            served = {item.dish_slug: item.category for item in menu_override.dishes}
+            menu_configured = True
+        else:
+            served = {item.dish_slug: item.category for item in WeeklyMenuDish.query.filter_by(weekday=meal_date.weekday(), meal_type=meal_type).all()}
+            menu_configured = bool(served)
+        if menu_configured and any(slug not in served for slug in selected_slugs):
+            raise ValueError("A selected dish was not served at this meal")
+        if not menu_configured:
+            served = {slug: "main" for slug in selected_slugs}
+        dish_ratings = [(slug, served.get(slug, "main"), rating("dish_rating") if legacy_mode else rating("dish_rating_" + slug)) for slug in selected_slugs]
+        if legacy_mode:
+            comments = (comments + ("\n\n" if comments else "") + f"Portion size: {portion_value}/5\nDish feedback: {next(d[1] for d in MENU_DISHES if d[0] == selected_slugs[0])} — {dish_ratings[0][2]}/5").strip()
         if len(comments) > 1200:
-            raise ValueError("Combined feedback is too long")
+            raise ValueError("Comments are too long")
 
         respondent_hash = respondent_digest(respondent_token)
         duplicate = AnonymousSubmission.query.filter_by(
@@ -585,7 +641,7 @@ def feedback():
             meal_date=meal_date,
             meal_type=meal_type,
         ))
-        db.session.add(Feedback(
+        feedback_record = Feedback(
             meal_date=meal_date,
             meal_type=meal_type,
             food_rating=rating("food_rating"),
@@ -593,7 +649,12 @@ def feedback():
             variety_rating=rating("variety_rating"),
             cleanliness_rating=rating("cleanliness_rating"),
             comments=comments,
-        ))
+        )
+        db.session.add(feedback_record)
+        db.session.flush()
+        db.session.add(PortionRating(feedback_id=feedback_record.id, rating=portion_value))
+        for slug, category, value in dish_ratings:
+            db.session.add(DishRating(feedback_id=feedback_record.id, dish_slug=slug, category=category, rating=value))
         db.session.commit()
         return redirect(url_for("feedback_thanks"))
     except (ValueError, TypeError):
@@ -609,6 +670,130 @@ def feedback():
         app.logger.exception("Could not save feedback")
         flash(translate("We could not save your feedback. Please try again later.", "לא הצלחנו לשמור את המשוב. נסו שוב מאוחר יותר."), "error")
         return render_template("feedback.html"), 503
+
+
+
+def menu_items_for(meal_date, meal_type):
+    override = DailyMenuOverride.query.filter_by(meal_date=meal_date, meal_type=meal_type).first()
+    if override is not None:
+        rows = [(item.dish_slug, item.category) for item in override.dishes]
+    else:
+        rows = [(item.dish_slug, item.category) for item in WeeklyMenuDish.query.filter_by(weekday=meal_date.weekday(), meal_type=meal_type).all()]
+    by_slug = {dish[0]: dish for dish in MENU_DISHES}
+    return [{"slug": slug, "he": by_slug[slug][1], "en": by_slug[slug][2], "category": category}
+            for slug, category in rows if slug in by_slug]
+
+
+@app.get("/api/menu")
+@limiter.limit("60 per minute")
+def public_meal_menu():
+    try:
+        meal_date = datetime.strptime(request.args.get("date", ""), "%Y-%m-%d").date()
+        meal_type = request.args.get("meal_type", "").strip().lower()
+        if meal_type not in {"breakfast", "lunch", "dinner"}:
+            raise ValueError()
+    except ValueError:
+        return {"error": "Invalid date or meal"}, 400
+    items = menu_items_for(meal_date, meal_type)
+    override_exists = DailyMenuOverride.query.filter_by(meal_date=meal_date, meal_type=meal_type).first() is not None
+    configured = override_exists or bool(items)
+    return {"date": meal_date.isoformat(), "meal_type": meal_type, "configured": configured, "dishes": items}
+
+
+@app.get("/api/admin/menu")
+@permission_required("can_manage_users")
+def admin_menu_data():
+    scope = request.args.get("scope", "weekly")
+    meal_type = request.args.get("meal_type", "").strip().lower()
+    if meal_type not in {"breakfast", "lunch", "dinner"}:
+        return {"error": "Invalid meal"}, 400
+    if scope == "weekly":
+        try:
+            weekday = int(request.args.get("weekday", "-1"))
+            if weekday not in range(7):
+                raise ValueError()
+        except ValueError:
+            return {"error": "Invalid weekday"}, 400
+        rows = WeeklyMenuDish.query.filter_by(weekday=weekday, meal_type=meal_type).all()
+        return {"override": False, "dishes": [{"slug": x.dish_slug, "category": x.category} for x in rows]}
+    if scope == "daily":
+        try:
+            target_date = datetime.strptime(request.args.get("date", ""), "%Y-%m-%d").date()
+        except ValueError:
+            return {"error": "Invalid date"}, 400
+        override = DailyMenuOverride.query.filter_by(meal_date=target_date, meal_type=meal_type).first()
+        if override is None:
+            rows = WeeklyMenuDish.query.filter_by(weekday=target_date.weekday(), meal_type=meal_type).all()
+            return {"override": False, "dishes": [{"slug": x.dish_slug, "category": x.category} for x in rows]}
+        return {"override": True, "dishes": [{"slug": x.dish_slug, "category": x.category} for x in override.dishes]}
+    return {"error": "Invalid scope"}, 400
+
+
+@app.route("/admin/menu", methods=["GET", "POST"])
+@permission_required("can_manage_users")
+def admin_menu():
+    valid_meals = {"breakfast", "lunch", "dinner"}
+    valid_slugs = {dish[0] for dish in MENU_DISHES}
+    if request.method == "POST":
+        action = request.form.get("action", "")
+        meal_type = request.form.get("meal_type", "").strip().lower()
+        if meal_type not in valid_meals:
+            abort(400)
+        if action == "clear_daily":
+            try:
+                target_date = datetime.strptime(request.form.get("meal_date", ""), "%Y-%m-%d").date()
+            except ValueError:
+                abort(400)
+            override = DailyMenuOverride.query.filter_by(meal_date=target_date, meal_type=meal_type).first()
+            if override is not None:
+                db.session.delete(override)
+            admin_audit("removed daily menu override")
+            db.session.commit()
+            flash(translate("Daily override removed. The weekly menu is active again.", "החריג הוסר והתפריט השבועי חזר להיות פעיל."), "success")
+            return redirect(url_for("admin_menu"))
+        selected = request.form.getlist("dish_slug")
+        if len(selected) != len(set(selected)) or any(slug not in valid_slugs for slug in selected):
+            abort(400)
+        entries = []
+        for slug in selected:
+            category = request.form.get("category_" + slug, "main")
+            if category not in {"main", "side"}:
+                abort(400)
+            entries.append((slug, category))
+        if action == "weekly":
+            try:
+                weekday = int(request.form.get("weekday", "-1"))
+                if weekday not in range(7):
+                    raise ValueError()
+            except ValueError:
+                abort(400)
+            WeeklyMenuDish.query.filter_by(weekday=weekday, meal_type=meal_type).delete()
+            for slug, category in entries:
+                db.session.add(WeeklyMenuDish(weekday=weekday, meal_type=meal_type, dish_slug=slug, category=category))
+            admin_audit("updated weekly menu")
+        elif action == "daily":
+            try:
+                target_date = datetime.strptime(request.form.get("meal_date", ""), "%Y-%m-%d").date()
+            except ValueError:
+                abort(400)
+            override = DailyMenuOverride.query.filter_by(meal_date=target_date, meal_type=meal_type).first()
+            if override is None:
+                override = DailyMenuOverride(meal_date=target_date, meal_type=meal_type)
+                db.session.add(override)
+                db.session.flush()
+            else:
+                DailyMenuDish.query.filter_by(menu_id=override.id).delete()
+            for slug, category in entries:
+                db.session.add(DailyMenuDish(menu_id=override.id, dish_slug=slug, category=category))
+            admin_audit("updated daily menu override")
+        else:
+            abort(400)
+        db.session.commit()
+        flash(translate("Menu saved.", "התפריט נשמר בהצלחה."), "success")
+        return redirect(url_for("admin_menu"))
+    weekly = WeeklyMenuDish.query.order_by(WeeklyMenuDish.weekday, WeeklyMenuDish.meal_type).all()
+    overrides = DailyMenuOverride.query.order_by(DailyMenuOverride.meal_date.desc()).limit(30).all()
+    return render_template("admin_menu.html", weekly=weekly, overrides=overrides, menu_dishes=MENU_DISHES)
 
 
 @app.get("/feedback/thanks")
@@ -665,10 +850,14 @@ def dashboard_response():
         translate("Taste", "טעם"): db.session.query(func.avg(Feedback.taste_rating)).scalar(),
         translate("Variety", "מגוון"): db.session.query(func.avg(Feedback.variety_rating)).scalar(),
         translate("Cleanliness", "ניקיון"): db.session.query(func.avg(Feedback.cleanliness_rating)).scalar(),
+        translate("Portion size", "כמות וגודל המנות"): db.session.query(func.avg(PortionRating.rating)).scalar(),
     } if can_view else {})
     recent = Feedback.query.order_by(Feedback.created_at.desc()).limit(100).all() if can_view else []
+    dish_stats = db.session.query(DishRating.dish_slug, DishRating.category, func.avg(DishRating.rating), func.count(DishRating.id)).group_by(DishRating.dish_slug, DishRating.category).order_by(func.avg(DishRating.rating).desc()).all() if can_view else []
+    dish_labels = {dish[0]: (dish[1], dish[2]) for dish in MENU_DISHES}
+    dish_results = [{"name": (dish_labels.get(slug, ("", slug))[1] if session.get("language", "en") != "he" else dish_labels.get(slug, ("", slug))[0]), "category": category, "average": average, "count": count} for slug, category, average, count in dish_stats]
     users = AdminUser.query.order_by(AdminUser.role.desc(), AdminUser.username.asc()).all() if can_manage else []
-    return render_template("admin.html", total=total, averages=averages, recent=recent, users=users, can_view_feedback=can_view, can_manage_users=can_manage)
+    return render_template("admin.html", total=total, averages=averages, recent=recent, users=users, can_view_feedback=can_view, can_manage_users=can_manage, dish_results=dish_results)
 
 
 @app.get("/admin")
