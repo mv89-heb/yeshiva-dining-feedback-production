@@ -94,6 +94,10 @@ class AdminPermissionTests(unittest.TestCase):
         self.assertIn(b"Mobile-first data cards", dashboard.data)
         self.assertIn(b"data-label=", dashboard.data)
         self.assertIn(b"New password", dashboard.data)
+        self.assertIn(b"overflow-x:clip", dashboard.data)
+        self.assertIn(b"flex-wrap:wrap", dashboard.data)
+        self.assertIn(b"table-layout:fixed", dashboard.data)
+        self.assertIn(b"min-width:0", dashboard.data)
 
     def test_dashboard_filters_feedback_by_date_and_meal(self):
         today = datetime.now(ZoneInfo("Asia/Jerusalem")).date()
