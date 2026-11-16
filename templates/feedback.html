@@ -61,31 +61,39 @@
 @media(max-width:420px){main{width:calc(100% - 1rem);padding-top:.75rem}.student-intro{border-radius:21px;padding:1.25rem}.meal-picker,.rating-panel,.dish-panel,.comments-panel{padding:1rem;border-radius:19px}.meal-option{min-height:78px}.meal-option-label{font-size:.75rem}.emoji-rating{gap:.1rem}.emoji-choice{min-height:67px}.face-label{font-size:.56rem}.question-emoji{flex-basis:38px;width:38px;height:38px}.dish-fields{grid-template-columns:1fr}.dish-rating-field{max-width:260px}.submit-sticky{bottom:.25rem}}
 @media(prefers-reduced-motion:reduce){.student-intro *,.student-form *{transition:none!important;animation:none!important}}
 
-/* Keep student feedback controls readable and contained on narrow phones. */
+
+
 @media(max-width:700px){
   .student-intro,.student-form,.meal-picker,.rating-panel,.dish-panel,.comments-panel,.submit-sticky{width:100%;max-width:100%;min-width:0}
-  .student-intro{overflow:hidden}
-  .meal-heading,.dish-heading,.comments-label{min-width:0;max-width:100%}
-  .meal-heading>div,.dish-heading>div,.question-copy{min-width:0;overflow-wrap:anywhere}
-  .meal-options{grid-template-columns:repeat(3,minmax(0,1fr));min-width:0}
-  .meal-option{min-width:0;padding-inline:.2rem}
-  .meal-option-label{max-width:100%;overflow-wrap:anywhere;text-align:center}
-  .emoji-rating{grid-template-columns:repeat(5,minmax(0,1fr));min-width:0}
-  .emoji-choice{min-width:0;padding-inline:0}
-  .face-label{max-width:100%;overflow-wrap:anywhere}
-  .dish-list{grid-template-columns:minmax(0,1fr);width:100%;min-width:0}
-  .dish-item,.dish-item-choice,.dish-item-rating{min-width:0;max-width:100%}
-  .dish-item .dish-stars{width:100%;max-width:100%}
-  .comments-panel textarea,.dish-search{width:100%;min-width:0;max-width:100%}
+  .student-intro{padding:1.15rem;border-radius:19px}
+  .student-intro h1{max-width:100%;font-size:clamp(1.8rem,9vw,2.6rem);overflow-wrap:anywhere}
+  .intro-topline{flex-wrap:wrap;gap:.35rem;font-size:.62rem}
+  .meal-picker,.rating-panel,.dish-panel,.comments-panel{padding:.9rem;border-radius:17px}
+  .meal-heading,.dish-heading,.comments-label{display:flex;max-width:100%;min-width:0;gap:.55rem}
+  .meal-heading>div,.dish-heading>div,.question-copy,.comments-label>span:last-child{flex:1 1 auto;min-width:0;overflow-wrap:anywhere}
+  .meal-options{grid-template-columns:repeat(3,minmax(0,1fr));gap:.35rem;width:100%;min-width:0}
+  .meal-option{width:100%;min-width:0;min-height:72px;padding:.35rem .15rem}
+  .meal-option-label{max-width:100%;font-size:.7rem;text-align:center;overflow-wrap:anywhere}
+  .emoji-rating{grid-template-columns:repeat(5,minmax(0,1fr));gap:.1rem;width:100%;min-width:0}
+  .emoji-choice{min-width:0;min-height:62px;padding:.25rem 0}
+  .face{font-size:clamp(1.35rem,7vw,1.8rem)}
+  .face-label{max-width:100%;font-size:.53rem;overflow-wrap:anywhere}
+  .dish-list{grid-template-columns:minmax(0,1fr);width:100%;max-width:100%;min-width:0}
+  .dish-item,.dish-item-choice,.dish-item-rating{width:100%;max-width:100%;min-width:0}
+  .dish-item .dish-stars{width:100%;max-width:100%;gap:.1rem}
+  .dish-item .dish-stars label{min-width:0}
+  .dish-search,.comments-panel textarea{width:100%;max-width:100%;min-width:0}
   .privacy-note{min-width:0;overflow-wrap:anywhere}
+  .submit-sticky{bottom:.25rem;padding:.7rem}
+  .submit-btn{width:100%;max-width:100%}
 }
 @media(max-width:360px){
-  .intro-topline{font-size:.58rem;letter-spacing:.06em;flex-wrap:wrap}
-  .meal-options{gap:.3rem}
-  .meal-option-label{font-size:.68rem}
-  .emoji-choice{gap:.15rem}
-  .face-label{font-size:.52rem}
-  .student-intro h1{font-size:1.85rem}
+  .student-intro{padding:1rem}
+  .meal-options{gap:.25rem}
+  .meal-option-label{font-size:.64rem}
+  .emoji-choice{gap:.1rem}
+  .face-label{font-size:.48rem}
+  .question-emoji{flex-basis:35px;width:35px;height:35px}
 }
 
 </style>
